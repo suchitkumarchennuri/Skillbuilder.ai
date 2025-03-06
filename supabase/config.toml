@@ -1,0 +1,13 @@
+[global]
+project_id = "yddffruzrxlxaurzspjb"
+[auth]
+enabled = true
+[auth.email]
+enable_confirmations = false
+[functions]
+[storage]
+enabled = true
+[realtime]
+enabled = true
+[rest]
+enabled = true

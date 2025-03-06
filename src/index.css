@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gradient-to-b from-dark-950 via-dark-900 to-dark-950 text-dark-100;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-medium relative 
+           overflow-hidden transition-all duration-300
+           bg-[linear-gradient(110deg,#f43f5e,45%,#ea580c,55%,#f43f5e)]
+           bg-[length:200%_100%] animate-shimmer
+           hover:scale-[1.02] active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-lg shadow-primary-500/20
+           hover:shadow-primary-500/30
+           active:shadow-primary-500/10
+           text-white;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-medium relative 
+           overflow-hidden transition-all duration-300
+           bg-[linear-gradient(110deg,#18181b,45%,#27272a,55%,#18181b)]
+           bg-[length:200%_100%] animate-shimmer
+           hover:scale-[1.02] active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-lg shadow-dark-900/20
+           hover:shadow-dark-900/30
+           active:shadow-dark-900/10
+           text-dark-100;
+  }
+
+  .btn-outline {
+    @apply px-4 py-2 rounded-lg font-medium relative
+           overflow-hidden transition-all duration-300
+           bg-[linear-gradient(110deg,#27272a,45%,#3f3f46,55%,#27272a)]
+           bg-[length:200%_100%] animate-shimmer
+           border-2 border-dark-600
+           hover:border-primary-500
+           text-dark-200 hover:text-primary-400
+           hover:shadow-lg hover:shadow-primary-500/10
+           active:scale-[0.98];
+  }
+
+  .nav-item {
+    @apply flex items-center px-3 py-2 text-sm font-medium rounded-lg
+           transition-all duration-300 relative
+           hover:bg-gradient-to-r hover:from-primary-500/20 hover:via-accent-500/10 hover:to-primary-400/10
+           active:from-primary-600/20 active:via-accent-600/10 active:to-primary-500/10;
+  }
+
+  .nav-item-active {
+    @apply bg-gradient-to-r from-primary-500/20 via-accent-500/10 to-primary-400/10
+           text-primary-400 before:absolute before:left-0 before:top-1/2
+           before:-translate-y-1/2 before:h-8 before:w-1
+           before:bg-gradient-to-b before:from-primary-500 before:to-accent-500 before:rounded-r-full;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 bg-dark-800 border 
+           border-dark-600 rounded-lg 
+           focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
+           text-white transition-all duration-300
+           placeholder:text-dark-400;
+  }
+
+  .card {
+    @apply bg-gradient-to-br from-dark-800 to-dark-800/95 rounded-xl shadow-xl 
+           border border-dark-700/50
+           backdrop-blur-sm transition-all duration-300
+           hover:shadow-primary-500/5 hover:border-dark-600/50
+           hover:from-dark-800/95 hover:to-dark-800/90;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r 
+           from-primary-400 via-accent-400 to-primary-600 animate-gradient;
+  }
+
+  .chart-tooltip {
+    @apply bg-dark-800/95 text-dark-100 px-3 py-2 rounded-lg shadow-xl
+           border border-dark-700/50 backdrop-blur-sm
+           text-sm leading-relaxed;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 8s linear infinite;
+}
