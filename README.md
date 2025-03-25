@@ -7,7 +7,7 @@ Skillbridge.ai website provides 4 kinds of features.
 4. Job analytics
 
 
-##Tech Stack Used:
+#Tech Stack Used:
 Frontend: Next.js/TypeScript
 Backend: Node.js
 Storage: Supabase
