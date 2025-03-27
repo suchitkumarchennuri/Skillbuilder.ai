@@ -8,6 +8,25 @@ SkillBridge AI is an advanced employment analytics platform that empowers users 
 ✅ Resume Tailor – Customize your resume for different job applications using AI recommendations.
 ✅ Job Analytics – Explore industry trends, top skills, and salary benchmarks across locations.
 
+🚀 Tech Stack Overview
+🎨 Frontend:
+🛠 Next.js & TypeScript – For a modern, scalable, and high-performance UI.
+
+⚙️ Backend:
+🖥 Node.js – Ensuring a robust and efficient server-side architecture.
+
+🗄 Storage:
+📦 Supabase – A powerful open-source alternative to Firebase for seamless data management.
+
+🔐 Authentication:
+🆔 Clerk.com – Simplifying user authentication with secure and flexible identity management.
+
+🌍 Deployment & Development:
+🚀 Optimized for both development and production environments for smooth scalability.
+
+🤖 AI Models Used:
+🧠 Multi-models powered by Gemma 3 & Gemini 2.0 Flash-Lite via OpenRouter – Delivering cutting-edge AI-driven capabilities.
+
 🔥 Usage
 📂 Upload Resume & Job Description
 Paste your resume text or upload a PDF/DOCX file.
@@ -21,6 +40,7 @@ Analyze role distributions in different regions.
 
 🎯 Tailor Your Resume
 Get AI-driven feedback to optimize your application.
+
 
 
 Skillbuilder.ai is a comprehensive employment analytics application designed to provide job market insights, skill gap analysis, and application tracking to help users make informed career choices.
