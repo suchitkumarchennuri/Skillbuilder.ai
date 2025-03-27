@@ -1,4 +1,4 @@
-
+Skillbuilder.ai is a comprehensive employment analytics application designed to provide job market insights, skill gap analysis, and application tracking to help users make informed career choices.
 Skillbridge.ai website provides 4 kinds of features. 
 1. Resume Analysis
 2. Linkedin Profile analysis 
