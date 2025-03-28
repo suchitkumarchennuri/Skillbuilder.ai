@@ -1,4 +1,4 @@
-                  **🚀 SkillBridge AI – Your Smart Career Companion**
+                  *🚀 SkillBridge AI – Your Smart Career Companion*
 **🔍 AI-Powered Employment Analytics & Job Market Insights**
 SkillBridge AI is an advanced employment analytics platform that empowers users with real-time job market insights, skill gap analysis, and application tracking tools to help users make informed career choices. SkillBridge AI provides the data-driven intelligence you need to make informed career decisions, whether you're a job seeker, recruiter, or workforce strategist.
 
@@ -56,6 +56,7 @@ The analytics shows the analysis of the skills salary ranges and role distributi
 
 **🤖 AI Models Used:**
 🧠 Multi-models powered by Gemma 3 & Gemini 2.0 Flash-Lite via OpenRouter – Delivering cutting-edge AI-driven capabilities.
+
 
 
 **🔥 Usage**
