@@ -1,4 +1,4 @@
-                  *🚀 SkillBridge AI – Your Smart Career Companion*
+                  *🚀 SkillBridge AI –Our Smart Career Companion*
 **🔍 AI-Powered Employment Analytics & Job Market Insights**
 SkillBridge AI is an advanced employment analytics platform that empowers users with real-time job market insights, skill gap analysis, and application tracking tools to help users make informed career choices. SkillBridge AI provides the data-driven intelligence you need to make informed career decisions, whether you're a job seeker, recruiter, or workforce strategist.
 
