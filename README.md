@@ -1,62 +1,22 @@
-                  🚀 SkillBridge AI – Your Smart Career Companion
-🔍 AI-Powered Employment Analytics & Job Market Insights
-SkillBridge AI is an advanced employment analytics platform that empowers users with real-time job market insights, skill gap analysis, and application tracking tools. SkillBridge AI provides the data-driven intelligence you need to make informed career decisions, whether you're a job seeker, recruiter, or workforce strategist.
+                  **🚀 SkillBridge AI – Your Smart Career Companion**
+**🔍 AI-Powered Employment Analytics & Job Market Insights**
+SkillBridge AI is an advanced employment analytics platform that empowers users with real-time job market insights, skill gap analysis, and application tracking tools to help users make informed career choices. SkillBridge AI provides the data-driven intelligence you need to make informed career decisions, whether you're a job seeker, recruiter, or workforce strategist.
 
-📌 Key Features
+
+
+**📌 Key Features**
 ✅ Resume Analyzer – Match your resume with job descriptions to optimize for ATS (Applicant Tracking Systems).
 ✅ LinkedIn Analyzer – Get personalized suggestions to enhance your LinkedIn profile visibility.
 ✅ Resume Tailor – Customize your resume for different job applications using AI recommendations.
 ✅ Job Analytics – Explore industry trends, top skills, and salary benchmarks across locations.
 
-🚀 Tech Stack Overview
-🎨 Frontend:
-🛠 Next.js & TypeScript – For a modern, scalable, and high-performance UI.
 
-⚙️ Backend:
-🖥 Node.js – Ensuring a robust and efficient server-side architecture.
-
-🗄 Storage:
-📦 Supabase – A powerful open-source alternative to Firebase for seamless data management.
-
-🔐 Authentication:
-🆔 Clerk.com – Simplifying user authentication with secure and flexible identity management.
-
-🌍 Deployment & Development:
-🚀 Optimized for both development and production environments for smooth scalability.
-
-🤖 AI Models Used:
-🧠 Multi-models powered by Gemma 3 & Gemini 2.0 Flash-Lite via OpenRouter – Delivering cutting-edge AI-driven capabilities.
-
-🔥 Usage
-📂 Upload Resume & Job Description
-Paste your resume text or upload a PDF/DOCX file.
-
-Paste the job description to compare compatibility.
-
-📈 View Job Market Insights
-Explore trending skills and salary distributions.
-
-Analyze role distributions in different regions.
-
-🎯 Tailor Your Resume
-Get AI-driven feedback to optimize your application.
-
-
-
-Skillbuilder.ai is a comprehensive employment analytics application designed to provide job market insights, skill gap analysis, and application tracking to help users make informed career choices.
 Skillbridge.ai website provides 4 kinds of features. 
 1. Resume Analysis
 2. Linkedin Profile analysis 
 3. Resume builder
 4. Job analytics
 
-
-Tech Stack Used:
-Frontend: Next.js/TypeScript
-Backend: Node.js
-Storage: Supabase
-Authentication: Clerk.com deplooyment and development modes.
-AI Model Used: Multi-models gemma3 and gemini 2.0 flash-lite from openrouter.
 
 **1. Resume Analysis **
 The Resume analysis tab shows us the required keywords in a word cloud based on the frequency of the words in the provided job description and the resume.
@@ -76,3 +36,41 @@ The region includes:
 **3. England **
 
 The analytics shows the analysis of the skills salary ranges and role distribution according to the region and state selected.
+
+
+**🚀 Tech Stack Overview**
+**🎨 Frontend:**
+🛠 Next.js & TypeScript – For a modern, scalable, and high-performance UI.
+
+**⚙️ Backend:**
+🖥 Node.js – Ensuring a robust and efficient server-side architecture.
+
+**🗄 Storage:**
+📦 Supabase – A powerful open-source alternative to Firebase for seamless data management.
+
+**🔐 Authentication:**
+🆔 Clerk.com – Simplifying user authentication with secure and flexible identity management.
+
+**🌍 Deployment & Development:**
+🚀 Optimized for both development and production environments for smooth scalability.
+
+**🤖 AI Models Used:**
+🧠 Multi-models powered by Gemma 3 & Gemini 2.0 Flash-Lite via OpenRouter – Delivering cutting-edge AI-driven capabilities.
+
+
+**🔥 Usage**
+*📂 Upload Resume & Job Description*
+Paste your resume text or upload a PDF/DOCX file.
+
+Paste the job description to compare compatibility.
+
+*📈 View Job Market Insights*
+Explore trending skills and salary distributions.
+
+Analyze role distributions in different regions.
+
+*🎯 Tailor Your Resume*
+Get AI-driven feedback to optimize your application.
+
+
+
