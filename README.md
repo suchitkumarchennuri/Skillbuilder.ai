@@ -1,337 +1,288 @@
 # SkillBridge AI
 
-SkillBridge AI is a comprehensive career development platform that provides job seekers and professionals with powerful tools for resume optimization, LinkedIn profile enhancement, job market analytics, and career insights. Built with modern web technologies and AI integration, the platform helps bridge the gap between job seeker skills and employer requirements.
+A modern web application built to help users enhance their skills and connect with opportunities.
 
-## 🚀 Features
+## Overview
 
-### Resume Analyzer
+SkillBridge AI is a React-based web application that provides users with a personalized dashboard to track their skill development, connect with opportunities, and visualize their progress through interactive data visualizations.
 
-- Advanced resume parsing and skills extraction using NLP algorithms
-- Machine learning-powered matching against job descriptions with interactive visualizations
-- Comprehensive skill gap analysis with actionable suggestions for improvement
-- Support for multiple file formats: PDF, DOCX, TXT, RTF with intelligent content extraction
-- ATS (Applicant Tracking System) compatibility checking and scoring
+## Features
 
-### LinkedIn Profile Analyzer
+### User Authentication and Profile Management
 
-- Comprehensive profile evaluation against industry standards and recruiter preferences
-- Section-by-section recommendations with specific improvement suggestions
-- Profile strength scoring and benchmarking against successful professionals in your field
-- Network analysis and connection recommendations based on career goals
-- Keyword optimization for improved LinkedIn search visibility
+- Secure user registration and login powered by Supabase Auth
+- Profile customization with skill tagging and interest tracking
+- Password recovery and account management
+- Role-based access control for different user types
 
-### Resume Tailor
+### Interactive Dashboard
 
-- AI-powered bullet point generation tailored for specific job descriptions
-- Skill keyword optimization and strategic integration for ATS systems
-- Experience highlighting based on precise job requirements and priorities
-- Professional wording and formatting suggestions with industry-specific terminology
-- Before/after comparison with improvement metrics
-
-### Job Market Analytics
-
-- Interactive map visualizations of job markets across different regions with real-time filtering
-- Comprehensive salary range insights by location, role, and experience level
-- Industry trend analysis and growth projections with historical data comparison
-- Skill demand forecasting with time-series data and predictive analytics
-- Geographic distribution of tech hubs with specialization details and emerging market indicators
-- Remote work opportunity tracking and analysis
-
-## 🛠️ Tech Stack
-
-### Frontend
-
-- **React 18** - Frontend library for building the user interface with latest features including Concurrent Mode
-- **TypeScript 5** - For type-safe code and improved developer experience with latest language features
-- **Tailwind CSS** - Utility-first CSS framework for responsive styling with custom design system
-- **React Router v6** - For client-side routing with data loading capabilities
-- **React Hook Form** - Form handling with validation and performance optimization
-- **Zod** - Type-safe schema validation library integrated with form handling
-- **Framer Motion** - Animations and transitions for enhanced user experience
-- **React Context API** - For state management across components
+- Personalized user dashboard with skill tracking metrics
+- Progress visualization with interactive charts
+- Recommendation engine for skill development opportunities
+- Custom widgets for productivity tracking
+- Real-time notifications and updates
 
 ### Data Visualization
 
-- **D3.js v7** - For creating custom interactive data visualizations with transitions and animations
-- **Leaflet/React-Leaflet** - Interactive maps for job market insights with custom layers and controls
-- **D3-Cloud** - For word cloud visualizations that highlight important skills and keywords
-- **TopoJSON** - For geographic boundary data with optimized file sizes
-- **Custom visualization components** - Tailored for specific career analytics use cases
+- Interactive skill mapping using D3.js force-directed graphs
+- Geographic data visualization with Leaflet maps
+- Word clouds for skill trend analysis using D3-cloud
+- Time-series data visualization for progress tracking
+- Custom SVG animations with Framer Motion integration
 
-### Backend & Database
+### Document Management
 
-- **Supabase** - For authentication, database, and storage with real-time capabilities
-- **PostgreSQL** - The underlying database used with Supabase, with advanced querying
-- **API Integration** - OpenRouter/GPT for AI analysis with managed rate limiting
-- **Edge Functions** - For serverless API routes with global distribution
-- **Row-level security (RLS)** - For secure data access control
+- Resume and document parsing with Mammoth.js
+- Skill extraction from uploaded documents
+- Conversion of various document formats to structured data
+- Document version history and comparison
 
-### Development & Tooling
+### Mobile Responsiveness
 
-- **Vite** - Modern build tool for fast development and optimized production builds
-- **ESLint with custom ruleset** - Code linting for consistent code quality
-- **TypeScript** - Static typing with strict mode and advanced type utilities
-- **File Parsing** - Support for PDF, DOCX, and plain text using Mammoth and pdf.js
-- **Husky & lint-staged** - For pre-commit hooks and automated code quality checks
-- **Vitest** - For unit and integration testing with React Testing Library
+- Adaptive layouts with Tailwind CSS
+- Touch-friendly interface for mobile devices
+- Progressive enhancement for various screen sizes
+- Optimized performance across devices
 
-### Authentication
+### Data Management
 
-- **Supabase Auth** - Email/password authentication with social provider options
-- **PKCE Flow** - For secure authentication following OAuth 2.0 best practices
-- **JWT Tokens** - For session management with automatic refresh
-- **Role-based access control** - For feature access management
+- Real-time data synchronization with Supabase Realtime
+- Optimistic UI updates for immediate feedback
+- Offline capability with local storage fallback
+- Data export and import functionality
 
-### Deployment & Performance
+## Tech Stack
 
-- **Compression** - GZIP and Brotli compression for reduced payload sizes
-- **Code Splitting** - For optimized loading and reduced initial bundle size
-- **Lazy Loading** - For better performance and reduced memory usage
-- **Lighthouse optimizations** - For best Core Web Vitals scores
-- **Service Worker** - For offline capabilities and improved loading performance
-- **CDN integration** - For globally distributed static assets
+- **Frontend**: React, TypeScript, Framer Motion
+- **Styling**: Tailwind CSS, CLSX
+- **Routing**: React Router
+- **Form Handling**: React Hook Form, Zod validation
+- **Data Visualization**: D3.js, Leaflet, Topojson
+- **Backend/Database**: Supabase
+- **Build Tools**: Vite, ESLint, TypeScript
+- **Performance**: Web Workers (Comlink)
 
-## 🔌 API Integrations
+## APIs and Integrations
 
-### LinkedIn Profile Extraction API
+### Supabase
 
-The application leverages the RapidAPI LinkedIn Profile Data API to extract and analyze LinkedIn profiles:
+- **Authentication**: Complete user authentication flow with email/password, OAuth providers, and magic links
+  - JWT token management with secure client-side storage
+  - Custom auth hooks with React Context for global auth state
+  - Multi-factor authentication implementation
+  - Session management with auto-refresh capabilities
+- **Database**: PostgreSQL database with Row-Level Security for data protection
+  - Real-time subscriptions using Supabase Realtime
+  - Optimized query patterns with prepared statements
+  - Complex joins for relational data retrieval
+  - Multi-tenant data isolation with RLS policies
+- **Storage**: File storage for document uploads with access control
+  - Content-type validation and file size limits
+  - CDN-backed file delivery with presigned URLs
+  - Automated image resizing for profile pictures
+  - Expiring links for sensitive documents
+- **Realtime**: WebSocket-based real-time data synchronization
+  - Channel-based subscription model
+  - Broadcast and presence channels for collaborative features
+  - Custom message filters for targeted updates
+  - Reconnection strategies with exponential backoff
+- **Edge Functions**: Serverless functions for backend processing
+  - Scheduled jobs for data aggregation and reporting
+  - Webhook handlers for third-party integrations
+  - Custom business logic implementation
+  - Environment-specific deployment configurations
 
-- **Provider**: RapidAPI LinkedIn Profile Data Extractor
-- **Endpoint**: `https://linkedin-profiles1.p.rapidapi.com/extract-profile`
-- **Rate Limits**: 100 requests/day on the standard plan
-- **Authentication**: API key-based authentication with header `x-rapidapi-key`
-- **Functionality**:
-  - Fetches comprehensive LinkedIn profile information with 98% accuracy
-  - Extracts experience, education, skills, and accomplishments with semantic analysis
-  - Retrieves user activity and engagement metrics for network strength assessment
-  - Captures profile completeness indicators for focused improvement suggestions
-  - Supports both public profiles and authenticated profile access
-- **Implementation**:
-  - API calls are cached for 24 hours to reduce rate limiting issues
-  - Results are processed through our AI analysis pipeline with 5-stage enhancement
-  - Optimized with exponential backoff retry mechanisms and comprehensive error handling
-  - Response data is transformed into a standardized profile schema for consistent processing
-  - Secure handling of profile data with encryption at rest and in transit
+### Rapid API Integrations
 
-### Job Search API (JSearch API)
+- **Profile Enrichment API**: Fetches and enriches user profile data with additional metadata
+  - Endpoints: `/api/profile/enrich`, `/api/profile/validate`
+  - Response caching strategy with 24-hour TTL
+  - Rate limiting: 100 requests/minute per API key
+  - Custom error handling with fallback responses
+  - Payload optimization for minimal data transfer
+- **Job Search API**: Real-time job listings and recommendations based on user skills
+  - Endpoints: `/api/jobs/search`, `/api/jobs/recommend`, `/api/jobs/trending`
+  - Query parameters: location, skills, experience level, salary range
+  - Pagination with cursor-based implementation
+  - Geolocation-based sorting and filtering
+  - Webhook support for saved search alerts
+- **Company Data API**: Provides company information and industry insights
+  - Endpoints: `/api/companies/profile`, `/api/companies/similar`
+  - Data fields: company size, funding status, technologies used, hiring trends
+  - Batch request capability (up to 20 companies per request)
+  - Industry classification using standard taxonomies
+  - Historical data access with time-series endpoints
+- **Skill Taxonomy API**: Standardized skill categorization and hierarchy mapping
+  - Endpoints: `/api/skills/search`, `/api/skills/related`, `/api/skills/trending`
+  - Hierarchical skill classification with parent-child relationships
+  - Cross-referencing with industry-standard frameworks
+  - Fuzzy matching for skill name variations
+  - Confidence scoring for skill identification
+- **Market Trends API**: Delivers industry and skill demand trends for career guidance
+  - Endpoints: `/api/trends/skills`, `/api/trends/industries`, `/api/trends/locations`
+  - Time-series data with customizable date ranges
+  - Geographical filtering capabilities
+  - Comparison metrics across industries and regions
+  - Forecast endpoints with confidence intervals
 
-For job market analytics and trends, the application interfaces with multiple job search APIs:
+### OpenRouter AI Integration
 
-- **Primary Provider**: JSearch API via RapidAPI
-- **Endpoint**: `https://jsearch.p.rapidapi.com/search`
-- **Secondary Providers**:
-  - GitHub Jobs API (for tech positions)
-  - Custom web scrapers for supplementary data from LinkedIn, Indeed, and Glassdoor
-- **Functionality**:
-  - Real-time job listings across multiple regions with 650,000+ daily active listings
-  - Salary data aggregation and normalization with regional cost-of-living adjustments
-  - Skills and requirements extraction using NLP and keyword frequency analysis
-  - Job market trend analysis with 3-month and 12-month historical comparisons
-- **Technical Implementation**:
-  - GraphQL-based querying for efficient data retrieval
-  - Automated ETL pipelines for data normalization and storage
-  - Incremental updates to minimize API usage and maintain freshness
-  - Fault-tolerant architecture with multiple provider failover
-- **Features**:
-  - Geolocation-based job mapping with 200+ metropolitan areas covered
-  - Historical data comparison spanning 24 months for trend analysis
-  - Skill demand tracking with month-over-month change indicators
-  - Industry-specific filtering with 35+ job categories
-  - Remote/hybrid/on-site work classification with trend analysis
+- **Gemini 1.5 Flash 8B**: Integration for intelligent skill analysis and recommendations
+  - Model parameters: temperature=0.7, top_p=0.9, max_tokens=1024
+  - Context window: 8K tokens for comprehensive analysis
+  - Specialized prompt templates for skill gap analysis
+  - Fine-tuned for career development recommendations
+  - Real-time inference for dynamic user interactions
+  - Implementation details:
+    - REST API integration with `/v1/chat/completions` endpoint
+    - Streaming response handling for progressive UI updates
+    - Request batching for efficiency (up to 5 requests/batch)
+    - Prompt engineering with system messages for domain-specific results
+    - JSON mode for structured data extraction
+- **Skill extraction and classification**: Automated skill identification from user data
+  - Custom NER (Named Entity Recognition) implementation
+  - Confidence scoring system (0-100) for extracted skills
+  - Integration with skill taxonomy for standardization
+  - Contextual skill relevance scoring
+- **Personalized learning path generation**: AI-powered custom learning recommendations
+  - Multi-step generation process with refinement iterations
+  - Learning resource categorization (courses, articles, projects)
+  - Difficulty level assessment for progressive learning
+  - Time-to-competency estimation for each skill
+- **Career trajectory prediction**: Data-driven career pathing suggestions
+  - Historical career progression data integration
+  - Industry-specific role transition probabilities
+  - Salary progression forecasting
+  - Required skill acquisition timeline
+- **Resume optimization**: Smart suggestions for resume improvements
+  - Keyword optimization for ATS compatibility
+  - Impact statement reformulation
+  - Skills gap highlighting with acquisition suggestions
+  - Industry-specific terminology recommendations
 
-### OpenRouter API for AI Models
+### D3.js Integration
 
-The application utilizes OpenRouter API to access state-of-the-art AI models for content analysis and generation:
+- Custom data visualization components
+- Interactive charts and graphs
+- Data transformation and manipulation
+- Animation and transition effects
+- Event handling for user interaction
 
-- **Service Provider**: OpenRouter (https://openrouter.ai/)
-- **Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
-- **Models Used**:
-  - Google: Gemini 2.0 Flash Lite - Primary model for standard analysis
-  - Google: Gemini 2.0 Flash Lite - For advanced resume tailoring and deep insights
-  - Claude 3.5 - For alternative analysis and cross-comparison
-- **Technical Configuration**:
-  - Temperature: 0.7 for creative content, 0.2 for analytical content
-  - Context window: Utilizes up to 32k tokens for comprehensive document analysis
-  - Response format: Structured JSON for consistent parsing
-  - Typical latency: 2-5 seconds for standard requests
-- **Functionality**:
-  - Resume optimization suggestions with 95% relevance to target job descriptions
-  - Job description analysis with key requirement extraction and prioritization
-  - Skill gap identification with personalized learning resource recommendations
-  - Professional content generation optimized for ATS systems and human reviewers
-  - LinkedIn profile enhancement recommendations based on industry best practices
-- **Implementation**:
-  - Advanced prompt engineering with 15+ specialized templates for different use cases
-  - Context management with efficient token usage and document chunking for large resumes
-  - Rate limiting and cost optimization strategies with tiered processing
-  - Fallback mechanisms for API availability using alternative endpoints
-  - Response validation and filtering to ensure professional and helpful content
-  - Custom fine-tuning for resume-specific terminology and formatting
-- **Benefits**:
-  - High-quality, tailored content generation with industry-specific terminology
-  - Consistent and reliable analysis across various document formats and styles
-  - Scalable AI capabilities with model switching based on complexity requirements
-  - Cost-effective access to multiple AI providers through unified API
-  - Continuous improvement through feedback loops and model performance tracking
+### Leaflet Maps
 
-## 💾 Data Sources
+- Interactive geographic data visualization
+- Custom map layers and overlays
+- Marker clustering for large datasets
+- GeoJSON data integration
+- User location tracking and proximity analysis
 
-- **GeoJSON Data**:
-  - Country and region boundary data from Natural Earth Data
-  - Tech hub datasets from multiple open sources
-  - Custom-generated region data for specialized visualization
-- **Job Market Data**:
-  - Live API data from job search providers
-  - Historical trend data from US Bureau of Labor Statistics
-  - Supplementary data from industry reports and surveys
-  - Pre-processed mock data for demonstration purposes
-- **Skills Database**:
-  - Comprehensive technical skills taxonomy with 2,500+ entries
-  - Domain-specific skill categorization across 35+ professional fields
-  - Skill relationship mapping for recommendation engines
-  - Trending and emerging skills tracking
+### Document Processing
 
-## 🏛️ Architecture
+- Mammoth.js for DOCX to HTML/text conversion
+- Structured data extraction from documents
+- Format normalization across different document types
+- Content analysis for skill identification
 
-The application follows a modern React architecture with:
+### Web Workers
 
-- **Frontend Architecture**:
-  - Component-based design with atomic design principles
-  - Custom hooks for reusable logic and state management
-  - Context API for global state with optimized re-renders
-  - Container/presentation pattern for separation of concerns
-- **Performance Optimizations**:
-  - Lazy-loaded routes for performance with Suspense boundaries
-  - Memoization of expensive calculations and renders
-  - Virtualized lists for handling large datasets
-- **User Experience**:
-  - Responsive design for all device types from mobile to large desktop
-  - Progressive enhancement for core functionality without JS
-  - Accessibility compliance with WCAG 2.1 AA standards
-- **Data Flow**:
-  - API service pattern for data fetching with consistent error handling
-  - Centralized data fetching with SWR for caching and revalidation
-  - Offline support for critical features
-- **Resilience**:
-  - Error boundary implementation for stability and graceful degradation
-  - Comprehensive logging and monitoring
-  - Retry mechanisms for transient failures
+- Comlink for simplified Web Worker communication
+- Background processing for intensive operations
+- UI thread offloading for smoother user experience
+- Parallel data processing for improved performance
 
-## 🚦 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
+- Node.js (latest LTS version recommended)
 - npm or yarn
-- Supabase account for backend services
-- API keys for integrated services
 
 ### Installation
 
 1. Clone the repository
 
-```bash
+```
 git clone <repository-url>
-cd skillbridge-ai
 ```
 
 2. Install dependencies
 
-```bash
+```
 npm install
-# or
-yarn
 ```
 
 3. Set up environment variables
-   Create a `.env` file in the root directory with the following:
+   Create a `.env` file in the root directory with the following variables:
 
 ```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_OPENROUTER_API_KEY=your_openrouter_api_key
-VITE_RAPIDAPI_KEY=your_rapidapi_key
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
 4. Start the development server
 
-```bash
+```
 npm run dev
-# or
-yarn dev
 ```
 
-5. Build for production
+## Available Scripts
 
-```bash
-npm run build
-# or
-yarn build
-```
+- `npm run dev` - Start the development server
+- `npm run build` - Build the application for production
+- `npm run lint` - Run ESLint to check code quality
+- `npm run preview` - Preview the production build locally
 
-## 📊 Features in Detail
+## Deployment
 
-### Job Market Map
+This project is configured for deployment on Netlify with the included `netlify.toml` configuration file.
 
-The Job Market Map component uses Leaflet.js to provide an interactive visualization of the tech job market across different regions. Key features include:
+## Project Structure
 
-- **Visualization Capabilities**:
-  - Color-coded regions based on job density with custom color scales
-  - Tech hub markers sized by importance with proportional scaling
-  - Specialty tech clusters with domain focus and skill specialization
-  - Interactive zoom levels with appropriate detail rendering
-  - Dynamic legend with contextual information
-- **Data Representation**:
-  - Detailed tooltips with salary and growth information
-  - Trend indicators for growing and declining markets
-  - Skill demand heat mapping by region
-- **User Interaction**:
-  - Real-time data updates based on selected filters
-  - Cross-filtering with other dashboard components
-  - Custom views for remote work opportunities
-  - Saved region comparisons for decision-making
-- **Technical Implementation**:
-  - Custom GeoJSON rendering with optimized performance
-  - Dynamic marker clustering for dense regions
-  - Responsive design that adapts to different screen sizes
-  - Accessible keyboard navigation and screen reader support
+- `/public` - Static assets
+  - `/images` - README and documentation images
+  - `/icons` - Application icons
+  - `/screenshots` - Application screenshots for documentation
+- `/src` - Application source code
+  - `/components` - React components
+  - `/contexts` - React context providers
+  - `/lib` - Utility functions and services
+  - `/types` - TypeScript type definitions
 
-### Resume Analysis
+## Screenshots and Demos
 
-The Resume Analyzer provides deep insights into how well your resume matches job descriptions:
+### Dashboard Overview
 
-- **Analysis Capabilities**:
-  - Skill matching percentage with weighted relevance scoring
-  - Missing keyword identification with context-aware suggestions
-  - Strength/weakness assessment across 12 resume dimensions
-  - Industry-specific optimization recommendations
-- **Visualization Features**:
-  - Interactive word clouds highlighting important terms
-  - Skills gap charts with suggestions for improvement
-  - Content distribution analysis
-  - Keyword density visualization
-- **Actionable Insights**:
-  - Improvement suggestions with example phrasing
-  - Content optimization tips based on industry best practices
-  - ATS optimization guidance for higher pass rates
-  - Comparative analysis against successful resumes
-- **Technical Implementation**:
-  - Natural language processing for semantic understanding
-  - Custom algorithms for matching beyond simple keyword counting
-  - Document structure analysis for formatting recommendations
-  - Privacy-focused processing with data minimization
+![Landing Page](public/assets/images/landing.png)
+_Landing page_
 
-## 🤝 Contributing
+![Dashboard Overview](public/assets/images/dashboard1.png)
+_Main dashboard interface showing skill tracking and visualization_
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### Data Visualization
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+![Data Charts](public/assets/images/dashboard2.png)
+_Interactive charts showing skill progression over time_
 
-## 📝 License
+### LinkedIn Profile Analyzer
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+![Data Charts](public/assets/images/linkedinprofile-analyzer.png)
+_LinkedIn Profile Analyzer_
+
+### Resume Analyzer
+
+![Data Charts](public/assets/images/resume-analyzer.png)
+_Resume Analyzer_
+
+### Resume Tailor
+
+![Data Charts](public/assets/images/resume-tailor.png)
+_Resume Tailor_
+
+## License
+
+[MIT License](LICENSE)
+
+## Acknowledgements
+
+- This project uses various open-source libraries and tools that make modern web development possible.
