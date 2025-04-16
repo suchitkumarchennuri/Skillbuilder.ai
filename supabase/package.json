@@ -1,0 +1,17 @@
+{
+  "name": "skillbridge-ai-supabase",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd .. && npm run dev",
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "deploy": "supabase deploy",
+    "reset": "supabase db reset",
+    "apply-sql": "supabase db execute --file ./migrations/linkedin_analysis_procedure.sql",
+    "apply-strengths-weaknesses": "supabase db execute --file ./migrations/add_linkedin_strengths_weaknesses.sql",
+    "fix-linkedin-table": "supabase db execute --file ./migrations/fix_linkedin_analyses_table.sql",
+    "apply-all": "npm run apply-sql && npm run apply-strengths-weaknesses && npm run fix-linkedin-table",
+    "generate-types": "supabase gen types typescript --local > ../src/types/supabase.ts"
+  }
+}
