@@ -1,10 +1,43 @@
 # SkillBridge AI
 
-A modern web application built to help users enhance their skills and connect with opportunities.
+A modern web application built to help users enhance their skills, connect with opportunities, and accelerate their career growth through AI-powered insights.
+
+## Introduction
+
+SkillBridge AI is an intelligent career development platform designed to bridge the gap between your current skills and your career aspirations. By leveraging advanced AI models and data visualization techniques, SkillBridge offers personalized insights and recommendations that help users optimize their professional profiles, identify skill gaps, and discover relevant opportunities in the job market.
+
+The platform analyzes various inputs including LinkedIn profiles, resumes, and job descriptions to provide actionable intelligence that gives users a competitive edge in today's rapidly evolving job market. Whether you're looking to transition careers, climb the corporate ladder, or simply keep your skills relevant, SkillBridge AI provides the tools and insights you need to succeed.
 
 ## Overview
 
 SkillBridge AI is a React-based web application that provides users with a personalized dashboard to track their skill development, connect with opportunities, and visualize their progress through interactive data visualizations.
+
+### Key Capabilities
+
+- **Profile Analysis**: Advanced AI-powered analysis of LinkedIn profiles and resumes to identify strengths, weaknesses, and improvement opportunities
+- **Skill Mapping**: Visual representation of your skill ecosystem and how it relates to market demands
+- **Job Market Intelligence**: Data-driven insights about job market trends, skill demands, and career opportunities
+- **Personalized Recommendations**: Custom-tailored suggestions for skill development, learning resources, and job applications
+- **Resume Optimization**: AI-assisted resume tailoring for specific job descriptions to maximize interview chances
+
+### Technical Architecture
+
+The application is built on a modern tech stack with React and TypeScript on the frontend, Supabase for backend services, and integration with various AI services and APIs:
+
+1. **Frontend Layer**: React application with TypeScript, Tailwind CSS for styling, and Framer Motion for animations
+2. **Authentication Layer**: Supabase Auth for secure user management with custom AuthContext provider
+3. **Data Layer**: PostgreSQL database (via Supabase) with real-time capabilities and row-level security
+4. **AI Integration Layer**: OpenRouter for access to Gemini AI models, with custom prompt engineering
+5. **Analytics Layer**: D3.js and custom visualization components for data presentation
+6. **API Integration Layer**: Multiple third-party APIs for job market data, company information, and skill taxonomies
+
+### Target Audience
+
+- **Job Seekers**: Professionals looking to optimize their resume and skills for specific job opportunities
+- **Career Changers**: Individuals planning career transitions who need to identify transferable skills
+- **Professionals**: Established workers wanting to stay current with industry skill demands
+- **HR & Recruiters**: Talent professionals seeking to match candidates with position requirements
+- **Learning & Development**: L&D teams building targeted upskilling programs
 
 ## Features
 
@@ -62,6 +95,229 @@ SkillBridge AI is a React-based web application that provides users with a perso
 - **Backend/Database**: Supabase
 - **Build Tools**: Vite, ESLint, TypeScript
 - **Performance**: Web Workers (Comlink)
+
+## Core Components and Code Architecture
+
+### Authentication System
+
+The application uses Supabase for authentication, with a custom AuthContext provider to manage user sessions throughout the application:
+
+```tsx
+// Authentication Context Provider
+import { createContext, useContext, useState } from "react";
+import { User } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ success: boolean; message?: string }>;
+  signOut: () => Promise<void>;
+}
+
+// Usage example:
+const { user, signIn, signOut } = useAuth();
+```
+
+### Supabase Integration
+
+Supabase handles database, authentication, and storage needs with a clean client setup:
+
+```typescript
+// src/lib/supabase.ts
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../types/supabase";
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storageKey: "skillbridge_auth_token",
+    storage: window.localStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: "pkce",
+  },
+});
+```
+
+### AI Integration with Gemini
+
+The application integrates with OpenRouter to access Google's Gemini 1.5 Flash model for intelligent analysis:
+
+```typescript
+// src/lib/gemini.ts
+import { z } from "zod";
+import { memoize, PerformanceMonitor } from "./utils";
+
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+const MODEL = "google/gemini-flash-1.5-8b";
+
+export const analyzeWithGemini = memoize(
+  async (
+    resumeText: string,
+    jobDescription: string,
+    signal?: AbortSignal
+  ): Promise<string> => {
+    // Implementation with OpenRouter API call
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `Job Description:\n${jobDescription}\n\nResume:\n${resumeText}`,
+            },
+          ],
+          max_tokens: 300,
+          temperature: 0.2,
+        }),
+        signal: signal,
+      }
+    );
+
+    // Process and return response
+  }
+);
+```
+
+### LinkedIn Profile Analysis
+
+The LinkedIn Analyzer is a sophisticated component that extracts and analyzes LinkedIn profiles:
+
+```tsx
+// src/components/dashboard/LinkedInAnalyzer.tsx
+export function LinkedInAnalyzer() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<LinkedInAnalysis | null>(null);
+  const { user } = useAuth();
+
+  const onSubmit = useCallback(
+    async (data: LinkedInFormData) => {
+      // Check for existing recent analysis first
+      let existingAnalysis = await checkExistingAnalysis(data.profileUrl);
+
+      if (!existingAnalysis) {
+        // Perform new analysis with AI integration
+        const result = await analyzeLinkedInProfile(
+          data.profileUrl,
+          abortController.current?.signal
+        );
+
+        // Save results to database
+        await saveToDatabase(user, data.profileUrl, result);
+      }
+
+      setAnalysis(existingAnalysis || result);
+    },
+    [user]
+  );
+
+  // Component rendering with form and results display
+}
+```
+
+### Resume Analysis and Tailoring
+
+The application provides AI-powered resume analysis and job-specific tailoring:
+
+```tsx
+// Resume Tailoring Component (simplified)
+export function ResumeTailor() {
+  // State and form handling
+
+  const generateTailoredContent = async (
+    resumeText: string,
+    jobDescription: string
+  ) => {
+    try {
+      // Generate tailored resume content using Gemini AI
+      const tailoredContent = await analyzeWithGemini(
+        resumeText,
+        jobDescription,
+        abortController.current?.signal
+      );
+
+      // Process and display results
+    } catch (error) {
+      // Error handling
+    }
+  };
+
+  // Component rendering
+}
+```
+
+### Data Visualization Architecture
+
+The application employs D3.js for advanced data visualization, with components like force-directed graphs and geographic visualizations:
+
+```tsx
+// Sample D3 Integration for Skill Network Visualization
+function SkillNetworkGraph({ skills, relationships }) {
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (!svgRef.current || !skills.length) return;
+
+    // D3 force simulation setup
+    const simulation = d3
+      .forceSimulation(skills)
+      .force(
+        "link",
+        d3.forceLink(relationships).id((d) => d.id)
+      )
+      .force("charge", d3.forceManyBody().strength(-200))
+      .force("center", d3.forceCenter(width / 2, height / 2));
+
+    // Rendering logic for nodes and links
+    // ...
+  }, [skills, relationships]);
+
+  return <svg ref={svgRef} width={width} height={height} />;
+}
+```
+
+### APIs and Integration
+
+The application integrates multiple external APIs for comprehensive data analysis:
+
+```typescript
+// Job Market API Integration
+export async function getJobMarketData(skills: string[], location: string) {
+  try {
+    const response = await fetch(`https://api.example.com/job-market`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({ skills, location }),
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch job market data");
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching job market data:", error);
+    throw error;
+  }
+}
+```
 
 ## APIs and Integrations
 
