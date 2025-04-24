@@ -541,4 +541,5 @@ _Resume Tailor_
 
 ## Acknowledgements
 
-- This project uses various open-source libraries and tools that make modern web development possible. 
+- This project uses various open-source libraries and tools that make modern web development possible in an insightfull way
+-  
