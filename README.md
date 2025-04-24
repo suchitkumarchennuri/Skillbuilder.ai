@@ -380,7 +380,7 @@ export async function getJobMarketData(skills: string[], location: string) {
   - Time-series data with customizable date ranges
   - Geographical filtering capabilities
   - Comparison metrics across industries and regions
-  - Forecast endpoints with confidence intervals
+  - Forecast endpoints with confidence intervals.
 
 ### OpenRouter AI Integration
 
