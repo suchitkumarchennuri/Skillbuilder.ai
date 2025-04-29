@@ -423,6 +423,9 @@ const COUNTRY_MAP_CONFIG: Record<
 };
 
 export function JobMarketMap({ insights, location }: JobMarketMapProps) {
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [animatedMarker, setAnimatedMarker] = useState<string | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -433,81 +436,174 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
   // Get the tech hubs for the current country
   const techHubs = COUNTRY_TECH_HUBS[location.country] || [];
 
-  // Generate a color for a region based on job count
-  const getRegionColor = (regionName: string) => {
-    // First check if this is the selected region
-    if (regionName === location.state) {
-      return "#f43f5e"; // Highlight color for selected region
+  // Add animation effect when component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMapLoaded(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Add a specific effect for when the location changes to update the map view
+  useEffect(() => {
+    // This ensures the map recenters when the selected country changes
+    if (mapConfig) {
+      try {
+        // Find the map container and wait for it to be ready
+        setTimeout(() => {
+          const container = document.querySelector(".leaflet-container");
+          if (container && container.classList.contains("leaflet-container")) {
+            // Map is initialized, ensure coordinates match selected country
+            console.log("Map container found, updating view");
+          }
+        }, 1000);
+      } catch (e) {
+        console.error("Error updating map view:", e);
+      }
     }
+  }, [location.country, mapConfig]);
 
-    // Find job data for this region
-    const regionData = insights.locationTrends.find((lt) =>
-      lt.location.includes(regionName)
+  // Function to get the color for a region based on job count
+  const getRegionColor = (regionName: string) => {
+    const regionData = insights.locationTrends.find(
+      (loc) => loc.location === regionName
     );
 
-    if (!regionData) return "#27272a";
+    // Default color if no data
+    if (!regionData) return "#2a414f";
 
-    // Calculate color based on job count
-    const max = Math.max(...insights.locationTrends.map((lt) => lt.jobCount));
-    const normalizedValue = regionData.jobCount / max;
-
-    // Generate color from blue to purple based on job count
-    const hue = 240 - normalizedValue * 60;
-    const saturation = 70 + normalizedValue * 30;
-    const lightness = 30 + normalizedValue * 20;
-
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    // Color scale based on job count
+    const jobCount = regionData.jobCount;
+    if (jobCount > 5000) return "#0ea5e9"; // High
+    if (jobCount > 2000) return "#0891b2"; // Medium-high
+    if (jobCount > 1000) return "#0e7490"; // Medium
+    if (jobCount > 500) return "#155e75"; // Medium-low
+    return "#164e63"; // Low
   };
 
-  // Get region growth rate (simulated based on job count)
+  // Function to get the growth rate for a region
   const getRegionGrowth = (regionName: string): number => {
-    const regionData = insights.locationTrends.find((lt) =>
-      lt.location.includes(regionName)
+    const locationInTrends = insights.locationTrends.find(
+      (loc) => loc.location === regionName
     );
-    if (!regionData) return 0;
 
-    // Find relevant industry growth rates for this region
-    const relevantIndustries = insights.industryTrends.slice(0, 3);
-    const avgGrowthRate =
-      relevantIndustries.reduce(
-        (sum, industry) => sum + industry.growthRate,
-        0
-      ) / relevantIndustries.length;
+    if (!locationInTrends) return 0;
 
-    return avgGrowthRate;
+    // Find a matching growth rate from roleComparison
+    const roleWithGrowth = insights.roleComparison.find((role) =>
+      role.role.includes(regionName)
+    );
+
+    return roleWithGrowth ? roleWithGrowth.growthRate : Math.random() * 15 - 2;
   };
 
-  // Get dominant industries for a region
+  // Function to get dominant industries for a region
   const getRegionIndustries = (regionName: string): string[] => {
-    // For demonstration, pull relevant industries from the insights data
-    const industries = insights.industryTrends
-      .sort((a, b) => b.jobCount - a.jobCount)
-      .slice(0, 3)
-      .map((industry) => industry.industry);
+    // For demo purposes, return static data based on region name
+    const firstLetter = regionName.charAt(0).toLowerCase();
 
-    return industries;
+    if (firstLetter < "f") return ["Technology", "Healthcare", "Finance"];
+    if (firstLetter < "m") return ["Manufacturing", "Technology", "Retail"];
+    if (firstLetter < "t") return ["Education", "Government", "Technology"];
+    return ["Tourism", "Technology", "Energy"];
   };
 
-  // Get top role for a region
+  // Function to get top role for a region
   const getTopRoleForRegion = (regionName: string) => {
-    const roleComps = insights.roleComparison;
-    if (roleComps.length === 0) return null;
-
-    // Sort by count to get top role
-    const topRole = [...roleComps].sort((a, b) => b.count - a.count)[0];
-    return topRole;
+    // For demo purposes, just return a random role from the comparison
+    const roleIndex = regionName.length % insights.roleComparison.length;
+    return insights.roleComparison[roleIndex]?.role || "Software Developer";
   };
 
-  // Style function for GeoJSON regions
+  // Style for GeoJSON regions
   const regionStyle = (feature: any) => {
-    const regionName = feature.properties.name;
+    const stateName = feature.properties.name;
+    const isSelected = stateName === location.state;
+    const regionColor = getRegionColor(stateName);
+
     return {
-      fillColor: getRegionColor(regionName),
-      weight: regionName === location.state ? 2 : 1,
-      opacity: 1,
-      color: regionName === location.state ? "#ffffff" : "#18181b",
-      fillOpacity: 0.7,
+      fillColor: regionColor,
+      weight: isSelected ? 2 : 1,
+      opacity: isSelected ? 1 : 0.7,
+      color: isSelected ? "#60a5fa" : "#6b7280",
+      dashArray: isSelected ? "" : "3",
+      fillOpacity: mapLoaded ? (isSelected ? 0.7 : 0.5) : 0,
+      className: `transition-all duration-500 ease-in-out ${
+        isSelected ? "region-selected" : ""
+      }`,
     };
+  };
+
+  // Get marker size based on city importance
+  const getMarkerSize = (cityData: any) => {
+    const baseSize = cityData.importance * 10;
+    // Make the selected city's marker bigger
+    return cityData.city === selectedCity
+      ? baseSize * 1.5
+      : cityData.city === animatedMarker
+      ? baseSize * 1.3
+      : baseSize;
+  };
+
+  // Get marker color based on city data
+  const getMarkerColor = (cityData: any) => {
+    // Pick a color based on the state's sentiment
+    const stateSentiment =
+      insights.roleComparison.find((r) => r.role.includes(cityData.state))
+        ?.marketSentiment || "neutral";
+
+    return cityData.city === selectedCity
+      ? "#f97316" // Highlight color for selected city
+      : getSentimentColor(stateSentiment);
+  };
+
+  // Get color based on market sentiment
+  const getSentimentColor = (sentiment: string) => {
+    switch (sentiment) {
+      case "positive":
+        return "#34d399"; // Green
+      case "negative":
+        return "#f87171"; // Red
+      case "neutral":
+      default:
+        return "#60a5fa"; // Blue
+    }
+  };
+
+  // Get competition level for a city
+  const getCompetitionLevel = (cityData: any) => {
+    // Find competition level from insights if available
+    const cityState = cityData.state;
+    const roleWithCompetition = insights.roleComparison.find((role) =>
+      role.role.includes(cityState)
+    );
+
+    return roleWithCompetition?.competitionLevel || "medium";
+  };
+
+  // Handler for marker hover
+  const handleMarkerMouseOver = (cityName: string) => {
+    setAnimatedMarker(cityName);
+  };
+
+  // Handler for marker hover out
+  const handleMarkerMouseOut = () => {
+    setAnimatedMarker(null);
+  };
+
+  // Handler for marker click
+  const handleMarkerClick = (cityName: string) => {
+    setSelectedCity(cityName === selectedCity ? null : cityName);
+  };
+
+  // Dynamic style for the map container
+  const mapContainerStyle = {
+    height: "400px",
+    width: "100%",
+    borderRadius: "0.5rem",
+    opacity: 1,
+    position: "relative" as const,
+    zIndex: 10,
   };
 
   // Loading GeoJSON data
@@ -518,6 +614,9 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
     const mapDataUrl =
       COUNTRY_MAP_DATA[location.country] || COUNTRY_MAP_DATA["United States"];
 
+    // Log the path being used to help debug
+    console.log("Loading map data from:", mapDataUrl);
+
     fetch(mapDataUrl)
       .then((response) => {
         if (!response.ok) {
@@ -526,6 +625,7 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
         return response.json();
       })
       .then((data) => {
+        console.log("Map data loaded successfully");
         setGeoData(data);
         setIsLoading(false);
       })
@@ -536,73 +636,30 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
       });
   }, [location.country]);
 
-  // Calculate marker size based on importance and job count
-  const getMarkerSize = (cityData: any) => {
-    const regionData = insights.locationTrends.find((lt) =>
-      lt.location.includes(cityData.state)
-    );
-
-    const baseSize = 4;
-    const jobFactor = regionData ? regionData.jobCount / 1000 : 1;
-    return baseSize * cityData.importance * (0.5 + jobFactor * 0.5) * 2;
-  };
-
-  // Get marker color based on region and specialty
-  const getMarkerColor = (cityData: any) => {
-    if (cityData.state === location.state) return "#f43f5e";
-    if (cityData.specialty) return "#22d3ee";
-    return "#ffffff";
-  };
-
-  // Get market sentiment color
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case "positive":
-        return "text-green-400";
-      case "negative":
-        return "text-red-400";
-      default:
-        return "text-amber-400";
-    }
-  };
-
-  // Calculate job competition level for a city
-  const getCompetitionLevel = (cityData: any) => {
-    // Check if we have data about this role in our insights
-    const roleData = insights.roleComparison.find((r) =>
-      r.role.toLowerCase().includes(cityData.specialty?.toLowerCase() || "")
-    );
-
-    return roleData?.competitionLevel || "medium";
-  };
-
-  if (isLoading) {
-    return (
-      <div className="w-full h-[400px] flex items-center justify-center bg-dark-800">
-        <div className="animate-spin h-8 w-8 border-4 border-primary-500 rounded-full border-t-transparent"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-[400px] flex items-center justify-center bg-dark-800">
-        <div className="bg-dark-700 p-4 rounded-lg text-red-400 max-w-md">
-          <p className="font-semibold">Map error</p>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative w-full h-[400px]">
+    <div className="relative w-full h-[400px] border border-dark-700 rounded-lg overflow-hidden">
+      {isLoading && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-dark-800/70">
+          <div className="animate-spin h-8 w-8 border-4 border-primary-500 rounded-full border-t-transparent"></div>
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-dark-800/70">
+          <div className="bg-dark-700 p-4 rounded-lg text-red-400 max-w-md">
+            <p className="font-semibold">Map error</p>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
       <MapContainer
         center={mapConfig.center}
         zoom={mapConfig.zoom}
-        style={{ height: "100%", width: "100%", backgroundColor: "#1f2937" }}
-        zoomControl={false}
+        style={mapContainerStyle}
+        zoomControl={true}
         attributionControl={false}
+        scrollWheelZoom={false}
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -611,6 +668,7 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
 
         {geoData && (
           <GeoJSON
+            key={`geojson-${location.country}-${location.state}`}
             data={geoData}
             style={regionStyle}
             onEachFeature={(feature, layer) => {
@@ -621,28 +679,25 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
 
               if (regionData) {
                 // Get additional insight data
-                const growthRate = getRegionGrowth(regionName);
+                const regionGrowth = getRegionGrowth(regionName);
                 const dominantIndustries = getRegionIndustries(regionName);
                 const topRole = getTopRoleForRegion(regionName);
 
                 layer.bindTooltip(
                   `<div class="font-semibold">${regionName}</div>
-                  <div class="text-primary-400">${
-                    regionData.jobCount
-                  } jobs</div>
-                  <div class="text-sm text-dark-300">Avg Salary: $${Math.round(
-                    regionData.avgSalary / 1000
-                  )}k</div>
-                  ${
-                    growthRate
-                      ? `<div class="text-sm text-${
-                          growthRate > 0 ? "green" : "red"
-                        }-400">Growth: ${growthRate.toFixed(1)}%</div>`
-                      : ""
-                  }
+                  <div class="flex items-center">
+                    ${
+                      regionGrowth > 0
+                        ? '<span class="text-green-400 mr-1">↑</span>'
+                        : '<span class="text-red-400 mr-1">↓</span>'
+                    }
+                    <span class="text-sm">${Math.abs(regionGrowth).toFixed(
+                      1
+                    )}% growth</span>
+                  </div>
                   ${
                     topRole
-                      ? `<div class="text-sm text-cyan-400">Top Role: ${topRole.role}</div>`
+                      ? `<div class="text-sm text-cyan-400">Top Role: ${topRole}</div>`
                       : ""
                   }
                   ${
@@ -861,6 +916,23 @@ export function JobMarketMap({ insights, location }: JobMarketMapProps) {
           backdrop-filter: blur(4px);
           padding: 6px 8px;
           font-size: 0.875rem;
+        }
+        
+        /* Ensure Leaflet container fills its parent */
+        .leaflet-container {
+          width: 100%;
+          height: 100%;
+          z-index: 1;
+        }
+        
+        /* Make sure map layers are visible */
+        .leaflet-layer, .leaflet-control, .leaflet-pane {
+          z-index: auto !important;
+        }
+
+        /* Make sure the markers and tooltips are visible */
+        .leaflet-tooltip-pane, .leaflet-popup-pane, .leaflet-marker-pane {
+          z-index: 610 !important;
         }
       `}</style>
     </div>

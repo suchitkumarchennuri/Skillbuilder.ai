@@ -542,19 +542,22 @@ export function JobMarketVisualizations({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6">
+        <div className="card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary-500/30">
           <h3 className="text-lg font-semibold text-white mb-4">
             Industry Distribution
           </h3>
           <div className="space-y-4">
             {insights.industryTrends.map((industry, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded hover:bg-dark-700/40 transition-all duration-300"
+              >
                 <div>
                   <p className="text-dark-200">{industry.industry}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <BarChart3 className="h-4 w-4 text-primary-400" />
                     <span className="text-sm text-dark-400">
-                      {industry.jobCount} jobs
+                      {industry.jobCount.toLocaleString()} jobs
                     </span>
                   </div>
                 </div>
@@ -584,7 +587,7 @@ export function JobMarketVisualizations({
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary-500/30">
           <h3 className="text-lg font-semibold text-white mb-4">
             Market Sentiment Analysis
           </h3>
@@ -592,8 +595,8 @@ export function JobMarketVisualizations({
             {insights.roleComparison
               .filter((role) => role.role === selectedRole)
               .map((role, index) => (
-                <div key={index} className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div key={index} className="space-y-5">
+                  <div className="flex items-center justify-between p-3 bg-dark-700/30 rounded-lg">
                     <div>
                       <p className="text-dark-200">Competition Level</p>
                       <p
@@ -603,7 +606,7 @@ export function JobMarketVisualizations({
                             : role.competitionLevel === "medium"
                             ? "text-amber-400"
                             : "text-green-400"
-                        }`}
+                        } transition-colors duration-300`}
                       >
                         {role.competitionLevel.charAt(0).toUpperCase() +
                           role.competitionLevel.slice(1)}
@@ -618,7 +621,7 @@ export function JobMarketVisualizations({
                             : role.marketSentiment === "neutral"
                             ? "text-amber-400"
                             : "text-red-400"
-                        }`}
+                        } transition-colors duration-300`}
                       >
                         {role.marketSentiment.charAt(0).toUpperCase() +
                           role.marketSentiment.slice(1)}
@@ -626,26 +629,37 @@ export function JobMarketVisualizations({
                     </div>
                   </div>
 
-                  <div>
-                    <p className="text-dark-200 mb-2">Demand Score</p>
-                    <div className="w-full bg-dark-700 rounded-full h-2">
+                  <div className="p-3 bg-dark-700/20 rounded-lg hover:bg-dark-700/30 transition-all duration-300">
+                    <p className="text-dark-200 mb-2 font-medium">
+                      Demand Score
+                    </p>
+                    <div className="w-full bg-dark-700 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-primary-500 h-2 rounded-full"
+                        className="bg-primary-500 h-2.5 rounded-full transition-all duration-700 ease-in-out"
                         style={{ width: `${role.demandScore}%` }}
                       />
                     </div>
-                    <p className="text-sm text-dark-400 mt-1">
-                      {Math.round(role.demandScore)}% of market demand
+                    <p className="text-sm text-dark-400 mt-2 flex items-center">
+                      <span className="font-medium text-primary-300">
+                        {Math.round(role.demandScore)}%
+                      </span>
+                      <span className="ml-1">of market demand</span>
                     </p>
                   </div>
 
-                  <div>
-                    <p className="text-dark-200 mb-2">Growth Rate</p>
+                  <div className="p-3 bg-dark-700/20 rounded-lg hover:bg-dark-700/30 transition-all duration-300">
+                    <p className="text-dark-200 mb-2 font-medium">
+                      Growth Rate
+                    </p>
                     <div className="flex items-center gap-2">
                       <p className="text-2xl font-bold text-primary-400">
-                        {role.growthRate}%
+                        {role.growthRate.toFixed(1)}%
                       </p>
-                      <TrendingUp className="h-5 w-5 text-green-500" />
+                      {role.growthRate >= 0 ? (
+                        <TrendingUp className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <TrendingDown className="h-5 w-5 text-red-500" />
+                      )}
                     </div>
                     <p className="text-sm text-dark-400 mt-1">Year over Year</p>
                   </div>

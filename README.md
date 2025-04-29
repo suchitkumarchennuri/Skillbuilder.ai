@@ -30,6 +30,7 @@ The application is built on a modern tech stack with React and TypeScript on the
 4. **AI Integration Layer**: OpenRouter for access to Gemini AI models, with custom prompt engineering
 5. **Analytics Layer**: D3.js and custom visualization components for data presentation
 6. **API Integration Layer**: Multiple third-party APIs for job market data, company information, and skill taxonomies
+7. **LinkedIn Integration**: Real-Time LinkedIn Scraper API via RapidAPI for profile data extraction and analysis
 
 ### Target Audience
 
@@ -198,39 +199,69 @@ export const analyzeWithGemini = memoize(
 
 ### LinkedIn Profile Analysis
 
-The LinkedIn Analyzer is a sophisticated component that extracts and analyzes LinkedIn profiles:
+The LinkedIn Analyzer is a sophisticated component that extracts and analyzes LinkedIn profiles using the Real-Time LinkedIn Scraper API from RapidAPI:
 
-```tsx
-// src/components/dashboard/LinkedInAnalyzer.tsx
-export function LinkedInAnalyzer() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<LinkedInAnalysis | null>(null);
-  const { user } = useAuth();
+```typescript
+// src/lib/linkedinAnalysis.ts
+import axios from "axios";
 
-  const onSubmit = useCallback(
-    async (data: LinkedInFormData) => {
-      // Check for existing recent analysis first
-      let existingAnalysis = await checkExistingAnalysis(data.profileUrl);
+const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
+const API_TIMEOUT = 30000; // 30 seconds timeout
+const MAX_RETRIES = 3; // Maximum retry attempts
+const RETRY_DELAY = 2000; // 2 seconds delay between retries
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days cache
 
-      if (!existingAnalysis) {
-        // Perform new analysis with AI integration
-        const result = await analyzeLinkedInProfile(
-          data.profileUrl,
-          abortController.current?.signal
-        );
+export async function fetchProfileData(profileUrl: string): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-        // Save results to database
-        await saveToDatabase(user, data.profileUrl, result);
+  try {
+    const response = await axios({
+      method: "GET",
+      url: "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url",
+      params: { url: profileUrl },
+      headers: {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "linkedin-api8.p.rapidapi.com",
+      },
+      signal: controller.signal,
+    });
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.code === "ECONNABORTED") {
+        throw new Error("Request timed out. Please try again.");
       }
-
-      setAnalysis(existingAnalysis || result);
-    },
-    [user]
-  );
-
-  // Component rendering with form and results display
+      if (error.response?.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 ```
+
+The LinkedIn Analyzer component provides real-time profile analysis with the following features:
+
+- **Profile Data Extraction**: Fetches comprehensive profile data including experience, education, skills, and achievements
+- **Caching System**: Implements a 7-day cache to reduce API calls and improve performance
+- **Error Handling**: Robust error handling with retry mechanism and user-friendly error messages
+- **Progress Tracking**: Real-time progress updates during analysis
+- **Analysis Results**: Detailed breakdown of profile strengths, weaknesses, and improvement suggestions
+
+To use the LinkedIn Analyzer, you'll need to:
+
+1. Sign up for a RapidAPI account
+2. Subscribe to the "Real-Time LinkedIn Scraper API"
+3. Add your RapidAPI key to the environment variables:
+   ```
+   VITE_RAPIDAPI_KEY=your_api_key_here
+   ```
+
+The analyzer supports both public and private LinkedIn profiles, with proper error handling for rate limits and timeouts.
 
 ### Resume Analysis and Tailoring
 

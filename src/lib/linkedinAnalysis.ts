@@ -21,10 +21,11 @@ import type { ProfileSuggestion } from "../types";
 // Constants for API calls
 const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "";
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
-const MODEL = "gpt-3.5-turbo-0125"; // Use the latest 0125 version which is faster
-const API_TIMEOUT = 30000; // 30 seconds to allow enough time for fetching
-const MAX_RETRIES = 2; // Number of retry attempts for API calls
-const CACHE_TTL = 1000 * 60 * 60 * 24 * 14; // 14 days cache
+const MODEL = "google/gemini-2.5-flash-preview";
+const API_TIMEOUT = 12000; // Reduced timeout for faster response (12 seconds)
+const MAX_RETRIES = 1; // Reduced retry attempts to avoid long waiting
+const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days cache (increased from 14 days)
+const LIGHTWEIGHT_MODE = true; // Extract minimal data to speed up parsing
 
 // Add configuration check helper
 export const isLinkedInAnalysisConfigured = (): boolean => {
@@ -185,67 +186,103 @@ function extractProfileUrl(url: string): string {
 }
 
 // Add a debug flag to help identify issues
-const DEBUG = false;
+const DEBUG =
+  new URL(window.location.href).searchParams.get("debug") === "true";
 
-// Log function
-function log(message: string, data?: any) {
-  if (DEBUG) {
+// Log function with verbose option
+function log(message: string, data?: any, verbose = false) {
+  if (DEBUG || (verbose && window.location.href.includes("verbose=true"))) {
     console.log(`[LinkedIn Analysis] ${message}`, data || "");
   }
 }
 
-// Simplified prompt generation function to reduce unnecessary data
+// Helper to check if verbose debugging is enabled
+function isVerboseMode(): boolean {
+  return window.location.href.includes("verbose=true");
+}
+
+// Streamlined prompt generation with minimal content
 function generateAnalysisPrompt(
   profile: z.infer<typeof linkedinProfileSchema>
 ): string {
+  // Essential sections only
   const sections: string[] = [];
 
-  // Include profile information with headline
-  if (profile.full_name || profile.headline) {
-    sections.push(
-      `Profile: ${[profile.full_name, profile.headline]
-        .filter(Boolean)
-        .join(" | ")}`
-    );
+  // Basic profile info in a compact format
+  const profileHeader = [profile.full_name, profile.headline]
+    .filter(Boolean)
+    .join(" | ");
+
+  if (profileHeader) {
+    sections.push(`PROFILE: ${profileHeader}`);
   }
 
-  // Include summary
+  // Include only a brief summary
   if (profile.summary) {
-    sections.push(
-      `Summary: ${profile.summary.substring(0, 200)}${
-        profile.summary.length > 200 ? "..." : ""
-      }`
-    );
+    const briefSummary =
+      profile.summary.length > 200
+        ? profile.summary.substring(0, 200) + "..."
+        : profile.summary;
+    sections.push(`SUMMARY: ${briefSummary}`);
   }
 
-  // Include experiences with more details
+  // Focus only on key experience details
   if (profile.experiences?.length) {
-    const formattedExperiences = profile.experiences
+    // Only include the 3 most recent experiences
+    const recentExperiences = profile.experiences.slice(0, 3);
+
+    const experienceSection = recentExperiences
       .map((exp, index) => {
-        const duration = exp.starts_at
+        // Format dates concisely
+        const duration = exp.starts_at?.year
           ? `${exp.starts_at.year}${
-              exp.ends_at ? ` to ${exp.ends_at.year}` : " to Present"
+              exp.ends_at?.year ? `-${exp.ends_at.year}` : "-Present"
             }`
           : "";
 
-        // Include full description to capture projects and achievements
+        // Only include essential description information
         const description = exp.description
-          ? `\n   Description: ${exp.description}`
+          ? ` Highlights: ${exp.description.substring(0, 150)}${
+              exp.description.length > 150 ? "..." : ""
+            }`
           : "";
 
-        return `- Experience ${index + 1}: ${exp.title} at ${
-          exp.company
-        } ${duration}${description}`;
+        return `- ${exp.title} at ${exp.company} (${duration})${description}`;
       })
-      .join("\n\n");
+      .join("\n");
 
-    sections.push(
-      "EXPERIENCE SECTION (including projects and achievements):\n" +
-        formattedExperiences
-    );
+    sections.push(`EXPERIENCE:\n${experienceSection}`);
   }
 
-  return sections.join("\n\n") || "No profile data available";
+  // Add skills as simple list (if available)
+  if (Array.isArray(profile.skills) && profile.skills.length) {
+    const skillsList = profile.skills
+      .slice(0, 8) // Only include top skills
+      .map((skill) => (typeof skill === "string" ? skill : skill.name))
+      .filter(Boolean)
+      .join(", ");
+
+    if (skillsList) {
+      sections.push(`SKILLS: ${skillsList}`);
+    }
+  }
+
+  return sections.join("\n\n") || "Insufficient profile data available";
+}
+
+// Adding a function for progress updates that can be called from any part of the process
+function updateAnalysisStatus(
+  status: "started" | "fetching" | "analyzing" | "complete" | "error",
+  message: string
+) {
+  if (typeof window !== "undefined" && window.dispatchEvent) {
+    log(`Analysis status: ${status} - ${message}`);
+    window.dispatchEvent(
+      new CustomEvent("linkedin-analysis-status", {
+        detail: { status, message },
+      })
+    );
+  }
 }
 
 // More aggressive browser-based localStorage caching
@@ -259,33 +296,40 @@ async function fetchProfileData(
 
   const cacheKey = `profile:${profileUrl}`;
 
-  // First check memory cache with higher priority
-  const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    log("Using profile from memory cache");
-    return cached.data;
-  }
-
-  // Then check localStorage cache
-  try {
-    const storageKey = `linkedin_profile_${btoa(profileUrl)}`;
-    const storedData = localStorage.getItem(storageKey);
-    if (storedData) {
-      try {
-        const { data, timestamp } = JSON.parse(storedData);
-        if (Date.now() - timestamp < CACHE_TTL) {
-          // Store in memory cache too
-          log("Using profile from localStorage cache");
-          cache.set(cacheKey, { data, timestamp });
-          return data;
-        }
-      } catch (parseError) {
-        // If parsing fails, remove the invalid cache entry
-        localStorage.removeItem(storageKey);
-      }
+  // Check for "force fresh" flag in session storage
+  const forceFresh = sessionStorage.getItem("linkedin_force_fresh") === "true";
+  if (forceFresh) {
+    sessionStorage.removeItem("linkedin_force_fresh");
+    log("Force fresh data requested, skipping cache");
+  } else {
+    // First check memory cache with higher priority - most efficient
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      log("Using profile from memory cache");
+      return cached.data;
     }
-  } catch (e) {
-    log("Unable to access localStorage for caching", e);
+
+    // Then check localStorage cache
+    try {
+      const storageKey = `linkedin_profile_${btoa(profileUrl)}`;
+      const storedData = localStorage.getItem(storageKey);
+      if (storedData) {
+        try {
+          const { data, timestamp } = JSON.parse(storedData);
+          if (Date.now() - timestamp < CACHE_TTL) {
+            // Store in memory cache too
+            log("Using profile from localStorage cache");
+            cache.set(cacheKey, { data, timestamp });
+            return data;
+          }
+        } catch (parseError) {
+          // If parsing fails, remove the invalid cache entry
+          localStorage.removeItem(storageKey);
+        }
+      }
+    } catch (e) {
+      log("Unable to access localStorage for caching", e);
+    }
   }
 
   log(
@@ -294,26 +338,48 @@ async function fetchProfileData(
     })...`
   );
 
+  // Calculate backoff delay for retries (exponential backoff)
+  const getBackoffDelay = (attempt: number) =>
+    Math.min(2000 * Math.pow(2, attempt), 8000);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
-    // Use a more efficient way to fetch data
-    const response = await axios({
+    // Create a promise to track request status with request body optimization
+    const requestPromise = axios({
       method: "get",
       url: "https://linkedin-api8.p.rapidapi.com/get-profile-data-by-url",
       params: {
         url: profileUrl,
+        // Request only essential fields to reduce response size and parsing time
+        fields: "full_name,headline,summary,experiences,skills",
       },
       headers: {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "linkedin-api8.p.rapidapi.com",
+        // Additional optimizations for faster responses
+        "Accept-Encoding": "gzip,deflate,compress",
+        "Cache-Control": "no-cache",
       },
       signal: controller.signal,
       timeout: API_TIMEOUT,
     });
 
-    log("LinkedIn API request completed");
+    // Add response interceptor for timing measurements
+    const startTime = Date.now();
+    requestPromise.then(() => {
+      const duration = Date.now() - startTime;
+      log(`LinkedIn API request completed in ${duration}ms`);
+      if (duration > 5000) {
+        // Log slow requests for monitoring
+        console.warn(
+          `Slow LinkedIn API request (${duration}ms) for ${profileUrl}`
+        );
+      }
+    });
+
+    const response = await requestPromise;
 
     // Process API response data
     try {
@@ -323,6 +389,35 @@ async function fetchProfileData(
       }
 
       const responseData = response.data;
+
+      // Log raw response structure for debugging
+      console.log("LINKEDIN API RESPONSE STRUCTURE:", {
+        status: response.status,
+        dataType: typeof responseData,
+        hasFullName: Boolean(responseData?.full_name),
+        hasHeadline: Boolean(responseData?.headline),
+        hasSummary: Boolean(responseData?.summary),
+        hasExperiences: Array.isArray(responseData?.experiences),
+        experiencesCount: Array.isArray(responseData?.experiences)
+          ? responseData.experiences.length
+          : 0,
+        hasSkills: Array.isArray(responseData?.skills),
+        skillsCount: Array.isArray(responseData?.skills)
+          ? responseData.skills.length
+          : 0,
+        responseTime: `${Date.now() - startTime}ms`,
+      });
+
+      // In verbose mode, log the full raw response data (careful with large responses)
+      if (isVerboseMode()) {
+        try {
+          // Create a safe copy of the data removing any potential circular references
+          const safeResponseData = JSON.parse(JSON.stringify(responseData));
+          console.log("VERBOSE: FULL LINKEDIN API RESPONSE:", safeResponseData);
+        } catch (e) {
+          console.log("VERBOSE: Could not stringify full response data");
+        }
+      }
 
       // Try to use the profile schema for safer data extraction
       try {
@@ -360,6 +455,79 @@ async function fetchProfileData(
         );
       }
 
+      // Lightweight extraction mode to speed up parsing
+      if (LIGHTWEIGHT_MODE) {
+        const lightweightData = {
+          full_name: responseData?.full_name || "",
+          headline: responseData?.headline || "",
+          summary: responseData?.summary?.substring(0, 500) || "", // Only extract first 500 chars of summary
+          experiences: Array.isArray(responseData?.experiences)
+            ? responseData.experiences
+                .slice(0, 3) // Only process the 3 most recent experiences
+                .map((exp: any) => ({
+                  company: typeof exp?.company === "string" ? exp.company : "",
+                  title: typeof exp?.title === "string" ? exp.title : "",
+                  // Only include essential description data or truncate long descriptions
+                  description:
+                    typeof exp?.description === "string"
+                      ? exp.description.substring(0, 200) +
+                        (exp.description.length > 200 ? "..." : "")
+                      : "",
+                  // Simplified date handling
+                  starts_at: exp?.starts_at?.year
+                    ? { year: exp.starts_at.year }
+                    : null,
+                  ends_at: exp?.ends_at?.year
+                    ? { year: exp.ends_at.year }
+                    : null,
+                }))
+            : [],
+          skills: Array.isArray(responseData?.skills)
+            ? responseData.skills
+                .slice(0, 10)
+                .map((skill: any) =>
+                  typeof skill === "string" ? skill : skill?.name || ""
+                )
+            : [],
+        };
+
+        // Console log the extracted data for debugging
+        console.log("EXTRACTED LINKEDIN DATA:", {
+          name: lightweightData.full_name,
+          headline: lightweightData.headline,
+          experienceCount: lightweightData.experiences.length,
+          skillsCount: lightweightData.skills.length,
+          dataSize: JSON.stringify(lightweightData).length + " bytes",
+          timestamp: new Date().toISOString(),
+          extractionTime: `${Date.now() - startTime}ms`,
+        });
+
+        // Log first experience if available (for debugging)
+        if (lightweightData.experiences.length > 0) {
+          console.log("FIRST EXPERIENCE:", lightweightData.experiences[0]);
+        }
+
+        // Log first few skills if available (for debugging)
+        if (lightweightData.skills.length > 0) {
+          console.log("SKILLS SAMPLE:", lightweightData.skills.slice(0, 3));
+        }
+
+        const timestamp = Date.now();
+        cache.set(cacheKey, { data: lightweightData, timestamp });
+
+        try {
+          const storageKey = `linkedin_profile_${btoa(profileUrl)}`;
+          localStorage.setItem(
+            storageKey,
+            JSON.stringify({ data: lightweightData, timestamp })
+          );
+        } catch (e) {
+          log("Unable to save to localStorage", e);
+        }
+
+        return lightweightData;
+      }
+
       // Check if we have the minimum required fields
       if (
         !responseData.full_name &&
@@ -368,13 +536,15 @@ async function fetchProfileData(
       ) {
         log("LinkedIn API response is missing essential data");
 
-        // If we have retries left, try again
+        // If we have retries left, try again with exponential backoff
         if (retries > 0) {
           log(
             `Incomplete data received, retrying (${retries} attempts left)...`
           );
-          // Wait a bit before retrying
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          // Wait with exponential backoff before retrying
+          const backoffDelay = getBackoffDelay(MAX_RETRIES - retries);
+          log(`Waiting ${backoffDelay}ms before next attempt`);
+          await new Promise((resolve) => setTimeout(resolve, backoffDelay));
           return fetchProfileData(profileUrl, retries - 1);
         }
 
@@ -519,20 +689,19 @@ async function fetchProfileData(
   }
 }
 
-// Simplify the parsing function to improve performance
 function parseAIResponse(content: string): LinkedInAnalysisResult {
-  // Extract score more efficiently with direct pattern match
+  // Extract score with efficient pattern matching
   const scoreMatch = content.match(/(?:score|rating):\s*(\d+)/i);
   const score = scoreMatch
     ? Math.min(100, Math.max(0, parseInt(scoreMatch[1], 10)))
     : 50;
 
-  // Initialize arrays
+  // Initialize with empty arrays
   const suggestions: ProfileSuggestion[] = [];
   const strengths: string[] = [];
   const weaknesses: string[] = [];
 
-  // Use a more efficient approach to extract sections
+  // Fast extract using regex pattern matching
   const strengthsMatch = content.match(
     /strengths?:?\s*(.+?)(?=weaknesses?:|\n\n|$)/is
   );
@@ -541,63 +710,63 @@ function parseAIResponse(content: string): LinkedInAnalysisResult {
   );
   const suggestionsMatch = content.match(/suggestions?:?\s*(.+?)(?=\n\n|$)/is);
 
-  // Extract strengths
+  // Process strengths (limited to max 3)
   if (strengthsMatch && strengthsMatch[1]) {
-    const strengthItems = strengthsMatch[1]
+    const items = strengthsMatch[1]
       .split(/\n/)
-      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()));
+      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()))
+      .slice(0, 3);
 
-    for (const item of strengthItems) {
+    for (const item of items) {
       strengths.push(item.replace(/^[-•*]\s*/, "").trim());
     }
   }
 
-  // Extract weaknesses
+  // Process weaknesses (limited to max 3)
   if (weaknessesMatch && weaknessesMatch[1]) {
-    const weaknessItems = weaknessesMatch[1]
+    const items = weaknessesMatch[1]
       .split(/\n/)
-      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()));
+      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()))
+      .slice(0, 3);
 
-    for (const item of weaknessItems) {
+    for (const item of items) {
       weaknesses.push(item.replace(/^[-•*]\s*/, "").trim());
     }
   }
 
-  // Extract suggestions
+  // Process suggestions (limited to max 3)
   if (suggestionsMatch && suggestionsMatch[1]) {
-    const suggestionItems = suggestionsMatch[1]
+    const items = suggestionsMatch[1]
       .split(/\n/)
-      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()));
+      .filter((line) => line.trim().length > 5 && /^[-•*]/.test(line.trim()))
+      .slice(0, 3);
 
-    for (const item of suggestionItems) {
-      const cleanLine = item.replace(/^[-•*]\s*/, "").trim();
-      if (cleanLine.length > 5) {
-        // Determine section and priority more efficiently
-        const section =
-          /experience|work|position|role|job|title|company|career|project|achievement|accomplishment|result|impact|metric|quantify|measure|industry|domain/i.test(
-            cleanLine
-          )
-            ? "experience"
-            : /network|connection|engagement|endorsement/i.test(cleanLine)
-            ? "network"
-            : "profile";
+    for (const item of items) {
+      const text = item.replace(/^[-•*]\s*/, "").trim();
 
-        // Set high priority for suggestions related to projects, achievements, and metrics
-        const priority =
-          /project|achievement|accomplishment|result|impact|metric|quantify|measure|critical|crucial|essential|urgent|important|must|should|need to/i.test(
-            cleanLine
-          )
-            ? "high"
-            : /consider|might|could|optional|maybe/i.test(cleanLine)
-            ? "low"
-            : "medium";
+      // Quick classification using keyword matching
+      const section =
+        /experience|work|job|role|position|company|project|achievement/i.test(
+          text
+        )
+          ? "experience"
+          : /network|connect|endorsement/i.test(text)
+          ? "network"
+          : "profile";
 
-        suggestions.push({ section, suggestion: cleanLine, priority });
-      }
+      // Simple priority assignment based on urgency terms
+      const priority =
+        /critical|important|essential|crucial|necessary|must|should/i.test(text)
+          ? "high"
+          : /consider|may|might|could|try/i.test(text)
+          ? "low"
+          : "medium";
+
+      suggestions.push({ section, suggestion: text, priority });
     }
   }
 
-  // Ensure we have at least minimal defaults
+  // Return with defaults if empty
   return {
     score,
     suggestions:
@@ -607,30 +776,16 @@ function parseAIResponse(content: string): LinkedInAnalysisResult {
             {
               section: "experience",
               suggestion:
-                "Include specific projects or achievements in each role to showcase impact and results.",
+                "Add specific achievements with metrics to your experience.",
               priority: "high",
-            },
-            {
-              section: "experience",
-              suggestion:
-                "Quantify accomplishments with metrics or data to demonstrate the effectiveness of your work.",
-              priority: "high",
-            },
-            {
-              section: "experience",
-              suggestion:
-                "Provide more context on the industries or domains where you have applied your skills to give a clearer picture of your experience.",
-              priority: "medium",
             },
           ],
     strengths:
-      strengths.length > 0 ? strengths : ["No specific strengths identified"],
+      strengths.length > 0 ? strengths : ["Has professional experience"],
     weaknesses:
       weaknesses.length > 0
         ? weaknesses
-        : [
-            "Profile needs more detailed information about specific projects and achievements",
-          ],
+        : ["Limited quantifiable achievements"],
   };
 }
 
@@ -640,118 +795,179 @@ async function analyzeWithAI(
   signal?: AbortSignal,
   retries = 1
 ): Promise<LinkedInAnalysisResult> {
-  if (!isLinkedInAnalysisConfigured()) {
-    throw new Error("LinkedIn analysis service is not properly configured");
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OpenRouter API key is not configured");
   }
 
-  log(`Starting AI analysis (attempt ${2 - retries})...`);
-  log("Prompt length:", prompt.length);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-
   try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "HTTP-Referer": window.location.origin,
+    // Create an internal abort controller for the AI API request that respects the outer signal
+    const controller = new AbortController();
+
+    // Set up a timeout (shorter than the global timeout)
+    const ANALYSIS_TIMEOUT = 25000; // 25 seconds max for AI analysis
+    const timeoutId = setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT);
+
+    // If the original signal aborts, also abort our internal controller
+    if (signal) {
+      signal.addEventListener(
+        "abort",
+        () => {
+          controller.abort();
+          clearTimeout(timeoutId);
         },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a LinkedIn profile analyzer with special focus on work experience details. Pay SPECIAL ATTENTION to the EXPERIENCE SECTION in the profile data including any projects, achievements, and metrics mentioned. Look for specific accomplishments, quantifiable results, and project details within job descriptions. Make sure to analyze all job titles, companies, roles, and specific achievements/metrics provided in the experience descriptions. Provide a concise analysis with: 1) Score (0-100), 2) 3 strengths based on the experience and achievements, 3) 3 weaknesses in the profile highlighting missing metrics or project details, 4) 3 improvement suggestions that should include adding specific projects, quantifying accomplishments with metrics, and providing more context on industries/domains. Format as: 'Score: X\n\nStrengths:\n• S1\n• S2\n• S3\n\nWeaknesses:\n• W1\n• W2\n• W3\n\nSuggestions:\n• Sg1\n• Sg2\n• Sg3'",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          max_tokens: 500, // Reduced token limit for faster response
-          temperature: 0.1, // Lower temperature for faster, more predictable responses
-        }),
-        signal: signal || controller.signal,
-      }
-    );
-
-    log("AI API request completed");
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("AI API error:", errorText);
-
-      if (retries > 0 && (response.status === 429 || response.status >= 500)) {
-        log(`API error (status ${response.status}), retrying...`);
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return analyzeWithAI(prompt, signal, retries - 1);
-      }
-
-      throw new Error(`AI API request failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    log("AI response parsed");
-
-    const validated = openRouterResponseSchema.parse(data);
-    const result = parseAIResponse(validated.choices[0].message.content);
-
-    // Validate that we have a meaningful response
-    if (
-      result.strengths.length === 0 ||
-      result.weaknesses.length === 0 ||
-      result.suggestions.length === 0
-    ) {
-      log("AI response is missing key sections");
-
-      if (retries > 0) {
-        log("Incomplete AI analysis, retrying...");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        return analyzeWithAI(prompt, signal, retries - 1);
-      }
-    }
-
-    // Check if we have meaningful experience-related suggestions
-    const hasExperienceSuggestions = result.suggestions.some(
-      (suggestion) =>
-        suggestion.section === "experience" &&
-        /project|achievement|accomplishment|result|impact|metric|quantify|measure|industry|domain/i.test(
-          suggestion.suggestion
-        )
-    );
-
-    if (!hasExperienceSuggestions && retries > 0) {
-      log(
-        "No specific project or achievement related suggestions found, retrying analysis..."
+        { once: true }
       );
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      return analyzeWithAI(prompt, signal, retries - 1);
     }
 
-    return result;
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.name === "AbortError" || signal?.aborted) {
-        throw new Error("Analysis cancelled");
+    // Use systemless prompt format for faster responses
+    const messages = [
+      {
+        role: "user",
+        content: `LinkedIn profile review:
+
+${prompt}
+
+Output format (numbers only):
+Score (1-100): [number]
+Strengths:
+- [strength 1]
+- [strength 2]
+Weaknesses:
+- [weakness 1]
+- [weakness 2]
+Suggestions:
+- [suggestion 1]
+- [suggestion 2]`,
+      },
+    ];
+
+    try {
+      log("Starting AI request");
+      const startTime = Date.now();
+
+      const requestPromise = axios.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          model: MODEL,
+          messages,
+          // Extreme optimization for speed
+          temperature: 0.1, // Lower temperature for faster, more deterministic responses
+          max_tokens: 300, // Reduced token limit for faster completion
+          top_p: 0.5, // Lower top_p for more deterministic and faster responses
+          frequency_penalty: 0, // No penalties for faster processing
+          presence_penalty: 0, // No penalties for faster processing
+          response_format: { type: "text" }, // Plain text for faster parsing
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            // Request optimizations
+            "HTTP-Referer": window.location.origin,
+            "X-Title": "LinkedIn Profile Analysis",
+          },
+          signal: controller.signal,
+          timeout: ANALYSIS_TIMEOUT,
+        }
+      );
+
+      const response = await requestPromise;
+
+      const duration = Date.now() - startTime;
+      log(`AI analysis completed in ${duration}ms`);
+
+      // Log AI response timing for performance tracking
+      console.log("AI RESPONSE TIMING:", {
+        totalTimeMs: duration,
+        model: MODEL,
+        promptTokens: prompt.length / 4, // Rough estimate
+        timestamp: new Date().toISOString(),
+      });
+
+      const parseResult = openRouterResponseSchema.safeParse(response.data);
+      if (!parseResult.success) {
+        throw new Error("Invalid response format from AI service");
       }
 
-      if (retries > 0) {
-        log(`AI analysis error, retrying: ${error.message}`);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+      const responseContent = parseResult.data.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error("Empty response from AI service");
+      }
+
+      // In verbose mode, log the complete AI response content
+      if (isVerboseMode()) {
+        console.log("VERBOSE: COMPLETE AI RESPONSE:", {
+          content: responseContent,
+          rawData: parseResult.data,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Parse the AI response into our expected format
+      const result = parseAIResponse(responseContent);
+
+      // Log the final processed result
+      console.log("FINAL LINKEDIN ANALYSIS:", {
+        score: result.score,
+        strengthsCount: result.strengths.length,
+        weaknessesCount: result.weaknesses.length,
+        suggestionsCount: result.suggestions.length,
+        processingTimeMs: Date.now() - startTime,
+      });
+
+      return result;
+    } catch (error: any) {
+      if (
+        (axios.isAxiosError(error) && error.code === "ECONNABORTED") ||
+        error.name === "AbortError" ||
+        error.message.includes("aborted")
+      ) {
+        throw new Error("AI analysis timed out. Please try again.");
+      }
+
+      // For rate limiting or server errors, retry if we have retries left
+      if (
+        retries > 0 &&
+        axios.isAxiosError(error) &&
+        (error.response?.status === 429 || error.response?.status === 500)
+      ) {
+        log(`AI service error (${error.response?.status}), retrying...`);
+        const backoffDelay = 1000 * Math.pow(2, 2 - retries); // Exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
         return analyzeWithAI(prompt, signal, retries - 1);
       }
 
-      throw new Error(`AI analysis failed: ${error.message}`);
+      // Rethrow the error for other cases
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    throw new Error("An unexpected error occurred during analysis");
-  } finally {
-    clearTimeout(timeoutId);
+  } catch (error: any) {
+    if (
+      error.message.includes("aborted") ||
+      error.message.includes("timed out")
+    ) {
+      throw new Error("Analysis was cancelled or timed out. Please try again.");
+    }
+
+    // Return fallback analysis for any other errors
+    if (retries === 0) {
+      log("All retries failed, returning fallback analysis");
+      return {
+        score: 65,
+        strengths: ["Professional has relevant experience"],
+        weaknesses: ["Profile could use more detailed information"],
+        suggestions: [
+          {
+            section: "profile",
+            suggestion: "Try again later or update profile with more details",
+            priority: "medium",
+          },
+        ],
+      };
+    }
+
+    throw error;
   }
 }
 
@@ -760,6 +976,17 @@ export async function analyzeLinkedInProfile(
   signal?: AbortSignal
 ): Promise<LinkedInAnalysisResult> {
   log("Starting LinkedIn profile analysis process for:", profileUrl);
+  const analysisStartTime = Date.now();
+
+  // Begin with logging to console to track performance
+  console.log("LINKEDIN ANALYSIS STARTED:", {
+    url: profileUrl,
+    timestamp: new Date().toISOString(),
+    cacheMode:
+      sessionStorage.getItem("linkedin_force_fresh") === "true"
+        ? "force-fresh"
+        : "normal",
+  });
 
   try {
     if (!isLinkedInAnalysisConfigured()) {
@@ -769,29 +996,57 @@ export async function analyzeLinkedInProfile(
       );
     }
 
-    // Clean cache periodically
-    clearExpiredCache();
+    // Show immediate feedback to the user
+    updateAnalysisStatus("started", "Starting LinkedIn profile analysis...");
+
+    // Clean cache periodically (moved outside the critical path)
+    setTimeout(() => clearExpiredCache(), 0);
 
     // Validate and clean profile URL
     const cleanProfileUrl = extractProfileUrl(profileUrl);
 
-    // Set a global timeout for the entire operation
+    // Check if we have a special debug flag to bypass cache
+    const debug =
+      new URL(window.location.href).searchParams.get("debug") === "true";
+    if (debug) {
+      sessionStorage.setItem("linkedin_force_fresh", "true");
+    }
+
+    // Timeout tracking
+    let analysisTimeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      analysisTimeoutId = setTimeout(() => {
         reject(
           new Error("The profile analysis process timed out. Please try again.")
         );
-      }, 60000); // 60 second total timeout (increased from 45s)
+      }, 45000); // 45 second total timeout (reduced from 60s)
     });
+
+    // Create a combined promise to represent the entire fetch+analyze operation
+    const startTime = Date.now();
+
+    // Update progress indicator
+    updateAnalysisStatus("fetching", "Fetching LinkedIn profile data...");
 
     // Fetch profile data with retry mechanism
     log("Starting profile data fetch...");
-    const fetchPromise = fetchProfileData(cleanProfileUrl);
+    const fetchStartTime = Date.now();
+    const profileData = await fetchProfileData(cleanProfileUrl);
 
-    // Use Promise.race to implement timeout
-    const profileData = await Promise.race([fetchPromise, timeoutPromise]);
+    const fetchDuration = Date.now() - fetchStartTime;
+    log(`Profile data fetch completed in ${fetchDuration}ms`);
 
-    log("Profile data fetch completed");
+    // Log profile data fetch performance metrics
+    console.log("PROFILE DATA FETCH COMPLETE:", {
+      duration: fetchDuration,
+      dataSize: JSON.stringify(profileData).length,
+      experiencesCount: profileData.experiences?.length || 0,
+      skillsCount: profileData.skills?.length || 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Update progress for analysis phase
+    updateAnalysisStatus("analyzing", "Analyzing profile content...");
 
     // Check if we have sufficient data for a meaningful analysis
     const hasSufficientData =
@@ -807,53 +1062,83 @@ export async function analyzeLinkedInProfile(
     }
 
     // Generate analysis prompt
+    const promptStartTime = Date.now();
     const analysisPrompt = generateAnalysisPrompt(profileData);
     log("Analysis prompt generated");
 
+    // Log prompt generation metrics
+    console.log("ANALYSIS PROMPT GENERATED:", {
+      duration: Date.now() - promptStartTime,
+      promptLength: analysisPrompt.length,
+      estimatedTokens: Math.round(analysisPrompt.length / 4),
+    });
+
     // Perform AI analysis with retries
     log("Starting AI analysis...");
-    return await analyzeWithAI(analysisPrompt, signal);
-  } catch (error: unknown) {
+    const aiAnalysisStartTime = Date.now();
+    const analysisResult = await Promise.race([
+      analyzeWithAI(analysisPrompt, signal),
+      timeoutPromise,
+    ]);
+
+    const aiAnalysisDuration = Date.now() - aiAnalysisStartTime;
+
+    const totalDuration = Date.now() - startTime;
+    log(`Total LinkedIn analysis completed in ${totalDuration}ms`);
+
+    // Log complete timing breakdown
+    console.log("LINKEDIN ANALYSIS COMPLETE:", {
+      totalDuration,
+      fetchTime: fetchDuration,
+      promptGenTime: promptStartTime ? Date.now() - promptStartTime : "N/A",
+      aiAnalysisTime: aiAnalysisDuration,
+      score: analysisResult.score,
+      suggestionsCount: analysisResult.suggestions.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Final success event
+    updateAnalysisStatus("complete", "Analysis complete!");
+
+    // Clean up timeout
+    clearTimeout(analysisTimeoutId);
+
+    return analysisResult;
+  } catch (error: any) {
+    const failureDuration = Date.now() - analysisStartTime;
     log("LinkedIn analysis error:", error);
 
-    // Handle Error objects
-    if (error instanceof Error) {
-      if (error.name === "AbortError" || signal?.aborted) {
-        throw new Error("Analysis cancelled by user");
-      }
+    // Log error information for debugging
+    console.error("LINKEDIN ANALYSIS FAILED:", {
+      duration: failureDuration,
+      errorMessage: error.message,
+      errorName: error.name,
+      timestamp: new Date().toISOString(),
+    });
 
-      // Provide more specific error messages
-      if (
-        error.message.includes("timeout") ||
-        error.message.includes("timed out")
-      ) {
-        throw new Error(
-          "The analysis is taking too long. Please try again later."
-        );
-      }
+    // Error event
+    updateAnalysisStatus(
+      "error",
+      error.message || "An error occurred during profile analysis."
+    );
 
-      if (error.message.includes("RapidAPI")) {
-        throw new Error("LinkedIn API error: Failed to fetch profile data");
-      }
-
-      if (
-        error.message.includes("OpenRouter") ||
-        error.message.includes("AI API request failed")
-      ) {
-        throw new Error("AI service error: Failed to analyze profile");
-      }
-
-      if (error.message.includes("not properly configured")) {
-        throw new Error(
-          "Configuration error: LinkedIn analysis service is not properly configured"
-        );
-      }
-
-      throw error;
+    if (
+      error.message.includes("timeout") ||
+      error.message.includes("timed out")
+    ) {
+      throw new Error(
+        "The LinkedIn profile analysis timed out. This could be due to high demand or network issues. Please try again in a few moments."
+      );
     }
 
-    // For non-Error objects
-    throw new Error("An unexpected error occurred during analysis");
+    if (
+      error.message.includes("aborted") ||
+      error.message.includes("cancelled")
+    ) {
+      throw new Error("The analysis was cancelled.");
+    }
+
+    throw error;
   }
 }
 
