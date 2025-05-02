@@ -11,6 +11,7 @@ import {
   Users,
   RefreshCw,
   Settings,
+  FileText,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -47,6 +48,8 @@ const sectionIcons = {
   profile: UserCircle,
   experience: Briefcase,
   network: Users,
+  skills: FileText,
+  education: CheckCircle2,
 } as const;
 
 // Verify the linkedin_analyses table has the right structure
@@ -81,14 +84,50 @@ export function LinkedInAnalyzer() {
     "idle" | "fetching" | "analyzing" | "processing"
   >("idle");
   const [progress, setProgress] = useState(0);
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
   const { user } = useAuth();
   const abortController = React.useRef<AbortController | null>(null);
+  const loadingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   log("Component initialized", { user: user?.id });
 
   // Verify table structure on component mount
   React.useEffect(() => {
     verifyTableStructure();
+  }, []);
+
+  // Add effect to track long-running loading states
+  React.useEffect(() => {
+    if (isLoading) {
+      setLoadingTooLong(false);
+      loadingTimerRef.current = setTimeout(() => {
+        setLoadingTooLong(true);
+      }, 45000); // Show warning after 45 seconds
+    } else {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, [isLoading]);
+
+  React.useEffect(() => {
+    return () => {
+      if (abortController.current) {
+        abortController.current.abort();
+      }
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
   }, []);
 
   const {
@@ -509,6 +548,26 @@ export function LinkedInAnalyzer() {
 
   const debouncedSubmit = debounce(onSubmit, 300);
 
+  const cancelAnalysis = () => {
+    if (abortController.current) {
+      abortController.current.abort();
+      abortController.current = null;
+    }
+    setIsLoading(false);
+    setLoadingTooLong(false);
+    setStage("idle");
+    setProgress(0);
+
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+
+    setError(
+      "Analysis was cancelled. The LinkedIn profile analysis was taking too long to complete."
+    );
+  };
+
   if (!isServiceAvailable) {
     return (
       <div className="w-full max-w-4xl mx-auto">
@@ -572,25 +631,52 @@ export function LinkedInAnalyzer() {
                 </p>
               )}
             </div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn-primary whitespace-nowrap"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                  {stage === "fetching"
-                    ? "Fetching Profile..."
-                    : "Analyzing..."}
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5 mr-2" />
-                  Analyze Profile
-                </>
-              )}
-            </button>
+            {loadingTooLong && isLoading ? (
+              <div className="flex-1 sm:flex-initial space-y-3">
+                <div className="flex items-center bg-amber-500/10 text-amber-400 p-3 rounded-lg">
+                  <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm">
+                      Analysis is taking longer than expected. This could be due
+                      to high server load.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={cancelAnalysis}
+                    className="flex-1 btn-outline"
+                  >
+                    Cancel Analysis
+                  </button>
+                  <button type="button" disabled className="flex-1 btn-primary">
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Still Analyzing...
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="btn-primary whitespace-nowrap"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    {stage === "fetching"
+                      ? "Fetching Profile..."
+                      : "Analyzing..."}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Analyze Profile
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </form>

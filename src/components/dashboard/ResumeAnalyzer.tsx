@@ -99,9 +99,11 @@ export function ResumeAnalyzer() {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
   const { user } = useAuth();
   const abortController = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if required API keys are available
   const isServiceAvailable = Boolean(import.meta.env.VITE_OPENROUTER_API_KEY);
@@ -111,9 +113,33 @@ export function ResumeAnalyzer() {
       if (abortController.current) {
         abortController.current.abort();
       }
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
       ResourceManager.cleanup();
     };
   }, []);
+
+  // Add effect to track long-running loading states
+  useEffect(() => {
+    if (isLoading) {
+      setLoadingTooLong(false);
+      loadingTimerRef.current = setTimeout(() => {
+        setLoadingTooLong(true);
+      }, 45000); // Show warning after 45 seconds
+    } else {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, [isLoading]);
 
   const {
     register,
@@ -374,6 +400,22 @@ export function ResumeAnalyzer() {
     }
   };
 
+  const cancelAnalysis = () => {
+    if (abortController.current) {
+      abortController.current.abort();
+      abortController.current = null;
+    }
+    setIsLoading(false);
+    setLoadingTooLong(false);
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+    setError(
+      "Analysis was cancelled. The resume analysis was taking too long to complete."
+    );
+  };
+
   const handleRefreshAnalysis = useCallback(() => {
     if (currentResumeText && currentJobDescription) {
       analyzeResume({
@@ -494,22 +536,49 @@ export function ResumeAnalyzer() {
         </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full sm:w-auto btn-primary"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                {fileError ? "Processing File..." : "Analyzing..."}
-              </>
-            ) : (
-              "Analyze Resume"
-            )}
-          </button>
+          {loadingTooLong && isLoading ? (
+            <div className="w-full">
+              <div className="flex items-center bg-amber-500/10 text-amber-400 p-3 rounded-lg mb-3">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm">
+                    Analysis is taking longer than expected. This could be due
+                    to high server load or complex resume content.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={cancelAnalysis}
+                  className="flex-1 btn-outline"
+                >
+                  Cancel Analysis
+                </button>
+                <button type="button" disabled className="flex-1 btn-primary">
+                  <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                  Still Analyzing...
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full sm:w-auto btn-primary"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                  {fileError ? "Processing File..." : "Analyzing..."}
+                </>
+              ) : (
+                "Analyze Resume"
+              )}
+            </button>
+          )}
 
-          {analysis && (
+          {analysis && !isLoading && (
             <button
               type="button"
               onClick={handleRefreshAnalysis}

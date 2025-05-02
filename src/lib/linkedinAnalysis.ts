@@ -12,18 +12,24 @@
  * - Caching for performance
  * - Error handling and retries
  * - Database-friendly formatting
+ * - Web Worker offloading for performance
  */
 
 import { z } from "zod";
+import { wrap } from "comlink";
+import type { Remote } from "comlink";
 import axios from "axios";
 import type { ProfileSuggestion } from "../types";
+
+// Import type for the worker
+import type { LinkedInWorker } from "./workers/linkedinWorker";
 
 // Constants for API calls
 const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "";
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
 const MODEL = "google/gemini-2.5-flash-preview";
-const API_TIMEOUT = 12000; // Reduced timeout for faster response (12 seconds)
-const MAX_RETRIES = 1; // Reduced retry attempts to avoid long waiting
+const API_TIMEOUT = 30000; // Increased timeout for reliability (30 seconds)
+const MAX_RETRIES = 2; // Increased retry attempts for reliability
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 30; // 30 days cache (increased from 14 days)
 const LIGHTWEIGHT_MODE = true; // Extract minimal data to speed up parsing
 
@@ -31,6 +37,21 @@ const LIGHTWEIGHT_MODE = true; // Extract minimal data to speed up parsing
 export const isLinkedInAnalysisConfigured = (): boolean => {
   return Boolean(RAPIDAPI_KEY) && Boolean(OPENROUTER_API_KEY);
 };
+
+// Lazy-load worker
+let worker: Remote<LinkedInWorker> | null = null;
+
+function getWorker(): Remote<LinkedInWorker> {
+  if (!worker) {
+    // Only create the worker once
+    const workerScript = new Worker(
+      new URL("./workers/linkedinWorker.ts", import.meta.url),
+      { type: "module" }
+    );
+    worker = wrap<LinkedInWorker>(workerScript);
+  }
+  return worker;
+}
 
 // LinkedIn skill schema
 const skillSchema = z.union([
@@ -1019,7 +1040,7 @@ export async function analyzeLinkedInProfile(
         reject(
           new Error("The profile analysis process timed out. Please try again.")
         );
-      }, 45000); // 45 second total timeout (reduced from 60s)
+      }, 45000); // 45 second total timeout
     });
 
     // Create a combined promise to represent the entire fetch+analyze operation
@@ -1031,17 +1052,38 @@ export async function analyzeLinkedInProfile(
     // Fetch profile data with retry mechanism
     log("Starting profile data fetch...");
     const fetchStartTime = Date.now();
-    const profileData = await fetchProfileData(cleanProfileUrl);
+    const profileDataRaw = await fetchProfileData(cleanProfileUrl);
 
     const fetchDuration = Date.now() - fetchStartTime;
     log(`Profile data fetch completed in ${fetchDuration}ms`);
 
+    // Initialize worker
+    const analysisWorker = getWorker();
+    log("Worker initialized for profile processing");
+
+    // Use worker to process the profile data in parallel with AI analysis
+    log("Starting profile data processing with worker...");
+    const processingStartTime = Date.now();
+
+    // Process profile data with worker
+    const processedData = await analysisWorker.parseProfileData(profileDataRaw);
+
+    const processingDuration = Date.now() - processingStartTime;
+    log(`Profile data processing completed in ${processingDuration}ms`);
+
+    // Generate initial suggestions with worker
+    const initialSuggestions = await analysisWorker.generateInitialSuggestions(
+      processedData
+    );
+
     // Log profile data fetch performance metrics
-    console.log("PROFILE DATA FETCH COMPLETE:", {
-      duration: fetchDuration,
-      dataSize: JSON.stringify(profileData).length,
-      experiencesCount: profileData.experiences?.length || 0,
-      skillsCount: profileData.skills?.length || 0,
+    console.log("PROFILE DATA PROCESSING COMPLETE:", {
+      duration: processingDuration,
+      processingTime: processingDuration,
+      fetchTime: fetchDuration,
+      experiencesCount: processedData.experiences?.length || 0,
+      skillsCount: processedData.skills?.length || 0,
+      initialScore: processedData.initialScore,
       timestamp: new Date().toISOString(),
     });
 
@@ -1050,10 +1092,10 @@ export async function analyzeLinkedInProfile(
 
     // Check if we have sufficient data for a meaningful analysis
     const hasSufficientData =
-      profileData.full_name ||
-      profileData.headline ||
-      profileData.summary ||
-      (profileData.experiences && profileData.experiences.length > 0);
+      processedData.full_name ||
+      processedData.headline ||
+      processedData.summary ||
+      (processedData.experiences && processedData.experiences.length > 0);
 
     if (!hasSufficientData) {
       throw new Error(
@@ -1061,14 +1103,13 @@ export async function analyzeLinkedInProfile(
       );
     }
 
-    // Generate analysis prompt
-    const promptStartTime = Date.now();
-    const analysisPrompt = generateAnalysisPrompt(profileData);
-    log("Analysis prompt generated");
+    // Use the preprocessed profile summary from the worker for AI analysis
+    const analysisPrompt = processedData.profileSummary;
+    log("Analysis prompt generated from worker");
 
     // Log prompt generation metrics
     console.log("ANALYSIS PROMPT GENERATED:", {
-      duration: Date.now() - promptStartTime,
+      duration: processingDuration,
       promptLength: analysisPrompt.length,
       estimatedTokens: Math.round(analysisPrompt.length / 4),
     });
@@ -1076,12 +1117,32 @@ export async function analyzeLinkedInProfile(
     // Perform AI analysis with retries
     log("Starting AI analysis...");
     const aiAnalysisStartTime = Date.now();
-    const analysisResult = await Promise.race([
+    const aiResult = await Promise.race([
       analyzeWithAI(analysisPrompt, signal),
       timeoutPromise,
     ]);
 
     const aiAnalysisDuration = Date.now() - aiAnalysisStartTime;
+
+    // Combine worker score with AI analysis
+    const combinedScore = Math.min(
+      Math.round((processedData.initialScore + aiResult.score) / 2),
+      100
+    );
+
+    // Combine worker suggestions with AI suggestions
+    const combinedSuggestions = [
+      ...initialSuggestions,
+      ...aiResult.suggestions,
+    ].slice(0, 10); // Limit to top 10 suggestions
+
+    // Final analysis result
+    const analysisResult: LinkedInAnalysisResult = {
+      score: combinedScore,
+      suggestions: combinedSuggestions,
+      strengths: aiResult.strengths,
+      weaknesses: aiResult.weaknesses,
+    };
 
     const totalDuration = Date.now() - startTime;
     log(`Total LinkedIn analysis completed in ${totalDuration}ms`);
@@ -1090,7 +1151,7 @@ export async function analyzeLinkedInProfile(
     console.log("LINKEDIN ANALYSIS COMPLETE:", {
       totalDuration,
       fetchTime: fetchDuration,
-      promptGenTime: promptStartTime ? Date.now() - promptStartTime : "N/A",
+      processingTime: processingDuration,
       aiAnalysisTime: aiAnalysisDuration,
       score: analysisResult.score,
       suggestionsCount: analysisResult.suggestions.length,

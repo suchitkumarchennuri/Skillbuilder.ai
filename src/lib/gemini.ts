@@ -1,10 +1,10 @@
-import { z } from 'zod';
-import { memoize, PerformanceMonitor } from './utils';
+import { z } from "zod";
+import { memoize, PerformanceMonitor } from "./utils";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-const MODEL = 'google/gemini-flash-1.5-8b';
+const MODEL = "google/gemini-flash-1.5-8b";
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
-const API_TIMEOUT = 15000; // 15 seconds
+const API_TIMEOUT = 30000; // 30 seconds
 
 // Add configuration check helper
 export const isGeminiConfigured = (): boolean => {
@@ -12,92 +12,146 @@ export const isGeminiConfigured = (): boolean => {
 };
 
 const responseSchema = z.object({
-  choices: z.array(z.object({
-    message: z.object({
-      content: z.string(),
-    }),
-  })),
+  choices: z.array(
+    z.object({
+      message: z.object({
+        content: z.string(),
+      }),
+    })
+  ),
 });
 
-// Enhanced prompt for more accurate analysis
-const SYSTEM_PROMPT = `You are an expert resume analyst. Your task is to analyze the provided resume and job description to generate highly relevant, achievement-focused bullet points for the resume. Follow these strict guidelines:
+// Enhanced prompt for more accurate analysis - optimized for speed
+const SYSTEM_PROMPT = `You are an expert resume analyst. Analyze the provided resume and job description to generate relevant bullet points. Focus on:
+1. Key skills that match the job
+2. Quantifiable achievements 
+3. Relevant experience
+4. Areas needing improvement
 
-1. Each bullet point must:
-   - Begin with a strong action verb in the correct tense
-   - Include specific, quantifiable achievements where possible
-   - Demonstrate direct relevance to the job requirements
-   - Be concise yet impactful (10-15 words maximum)
-   - Focus on results and impact, not just responsibilities
+Format: Exactly 5 bullet points, each beginning with •
+Keep responses concise and directly address job requirements.`;
 
-2. Format:
-   - Generate exactly 5 bullet points
-   - Each bullet point starts with "•"
-   - Ensure each point is unique and adds value
-   - Order by relevance to the job requirements
-
-3. Content Focus:
-   - Match key skills and requirements from the job description
-   - Emphasize achievements that align with the role
-   - Include technical skills and tools when relevant
-   - Highlight leadership and soft skills where appropriate
-
-Example format:
-• Increased team productivity by 40% through implementation of automated testing framework
-• Led cross-functional team of 8 engineers to deliver critical project under budget`;
+// Add retry utility
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const analyzeWithGemini = memoize(
-  async (resumeText: string, jobDescription: string, signal?: AbortSignal): Promise<string> => {
+  async (
+    resumeText: string,
+    jobDescription: string,
+    signal?: AbortSignal
+  ): Promise<string> => {
     if (!OPENROUTER_API_KEY) {
-      throw new Error('OpenRouter API key is not configured');
+      throw new Error("OpenRouter API key is not configured");
     }
 
     const performanceMonitor = PerformanceMonitor.getInstance();
-    const endMeasurement = performanceMonitor.startMeasurement('gemini-analysis');
+    const endMeasurement =
+      performanceMonitor.startMeasurement("gemini-analysis");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': window.location.origin,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            {
-              role: 'system',
-              content: SYSTEM_PROMPT,
-            },
-            {
-              role: 'user',
-              content: `Job Description:\n${jobDescription}\n\nResume:\n${resumeText}`,
-            },
-          ],
-          max_tokens: 300,
-          temperature: 0.2,
-          top_p: 0.9,
-          presence_penalty: 0.3,
-          frequency_penalty: 0.5,
-        }),
-        signal: signal ? signal : controller.signal,
-      });
+      const MAX_RETRIES = 2;
+      let retries = 0;
+      let lastError: Error | null = null;
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+      while (retries <= MAX_RETRIES) {
+        if (signal?.aborted) {
+          throw new Error("Analysis cancelled by user");
+        }
+
+        try {
+          // Prepare summarized content to reduce token count
+          const resumeSummary =
+            resumeText.length > 1500
+              ? resumeText.substring(0, 1500) + "..."
+              : resumeText;
+
+          const jobSummary =
+            jobDescription.length > 1000
+              ? jobDescription.substring(0, 1000) + "..."
+              : jobDescription;
+
+          const response = await fetch(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+                "HTTP-Referer": window.location.origin,
+              },
+              body: JSON.stringify({
+                model: MODEL,
+                messages: [
+                  {
+                    role: "system",
+                    content: SYSTEM_PROMPT,
+                  },
+                  {
+                    role: "user",
+                    content: `Job Description:\n${jobSummary}\n\nResume:\n${resumeSummary}`,
+                  },
+                ],
+                max_tokens: 250, // Reduced from 300
+                temperature: 0.1, // Reduced from 0.2 for faster responses
+                top_p: 0.7, // Reduced from 0.9 for faster responses
+                presence_penalty: 0, // Removed penalties for speed
+                frequency_penalty: 0, // Removed penalties for speed
+                response_format: { type: "text" }, // Plain text for faster parsing
+              }),
+              signal: signal ? signal : controller.signal,
+            }
+          );
+
+          if (!response.ok) {
+            // For 429 (rate limit) and 5xx (server errors), retry
+            if (response.status === 429 || response.status >= 500) {
+              lastError = new Error(
+                `API request failed: ${response.statusText}`
+              );
+              throw lastError;
+            }
+            throw new Error(`API request failed: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          const validated = responseSchema.parse(data);
+          const result = validated.choices[0].message.content;
+
+          const duration = endMeasurement();
+          console.debug(
+            `Gemini analysis completed in ${duration.toFixed(
+              2
+            )}ms after ${retries} retries`
+          );
+
+          return result;
+        } catch (error) {
+          // If the last retry or a non-retriable error, rethrow
+          if (
+            retries === MAX_RETRIES ||
+            (error instanceof Error && error.name === "AbortError")
+          ) {
+            throw error;
+          }
+
+          // Otherwise increment retry counter and wait before retrying
+          retries++;
+          const backoffTime = 1000 * Math.pow(2, retries); // Exponential backoff: 2s, 4s
+          console.debug(
+            `Retry ${retries}/${MAX_RETRIES} after ${backoffTime}ms`
+          );
+          await wait(backoffTime);
+        }
       }
 
-      const data = await response.json();
-      const validated = responseSchema.parse(data);
-      const result = validated.choices[0].message.content;
-
-      const duration = endMeasurement();
-      console.debug(`Gemini analysis completed in ${duration.toFixed(2)}ms`);
-
-      return result;
+      // This shouldn't happen but just in case
+      if (lastError) {
+        throw lastError;
+      }
+      throw new Error("Unexpected error in retry logic");
     } finally {
       clearTimeout(timeoutId);
     }

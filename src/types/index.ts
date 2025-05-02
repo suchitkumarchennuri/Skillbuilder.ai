@@ -32,7 +32,7 @@ export interface LinkedInAnalysis {
 }
 
 export interface ProfileSuggestion {
-  section: "profile" | "experience" | "network";
+  section: "profile" | "experience" | "network" | "skills" | "education";
   suggestion: string;
   priority: "high" | "medium" | "low";
 }
